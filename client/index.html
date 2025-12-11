@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title><!-- APP_TITLE --></title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <!-- Fonts (Work Sans) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Design System Foundations -->
+  <link rel="stylesheet" href="./design-system/colors/colors.css">
+  <link rel="stylesheet" href="./design-system/spacing/spacing.css">
+  <link rel="stylesheet" href="./design-system/typography/typography.css">
+
+  <!-- Design System Components -->
+  <link rel="stylesheet" href="./design-system/components/button/button.css">
+  <link rel="stylesheet" href="./design-system/components/boxes/boxes.css">
+  <link rel="stylesheet" href="./design-system/components/input/input.css">
+  <link rel="stylesheet" href="./design-system/components/dropdown/dropdown.css">
+  <link rel="stylesheet" href="./design-system/components/tags/tags.css">
+  <link rel="stylesheet" href="./design-system/components/modal/modal.css">
+
+  <!-- Template-specific components (layout, utilities, temporary components) -->
+  <link rel="stylesheet" href="./bespoke-template.css" />
+  <!-- APP_SPECIFIC_CSS -->
+</head>
+<body class="bespoke">
+  <!-- Navigation Header -->
+  <header class="header">
+    <h1>APP NAME</h1>
+    <!-- APP_SPECIFIC_HEADER_CONTENT -->
+    <div class="spacer"></div>
+    <div id="status" class="status">Ready</div>
+    <button id="btn-help" class="button button-text">Help</button>
+  </header>
+
+  <!-- Main Application Content -->
+  <!-- APP_SPECIFIC_MAIN_CONTENT -->
+
+  <!-- Core Scripts -->
+  <script type="module" src="./app.js"></script>
+  <!-- APP_SPECIFIC_SCRIPTS -->
+</body>
+</html>

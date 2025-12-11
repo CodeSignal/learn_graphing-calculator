@@ -1,0 +1,30 @@
+{
+  "name": "bespoke-template",
+  "version": "0.0.2",
+  "description": "Bespoke template with local development server and WebSocket messaging",
+  "main": "server.js",
+  "scripts": {
+    "start": "npm run start:prod",
+    "start:prod": "IS_PRODUCTION=true node server.js",
+    "start:dev": "concurrently \"npm run dev:vite\" \"npm run dev:api\"",
+    "dev:vite": "vite",
+    "dev:api": "PORT=3001 node server.js",
+    "build": "vite build"
+  },
+  "keywords": [
+    "bespoke",
+    "template",
+    "development",
+    "server",
+    "websocket"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "ws": "^8.14.2"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2",
+    "vite": "^7.2.4"
+  }
+}

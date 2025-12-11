@@ -1,0 +1,59 @@
+name: Build and Release
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Populate design system submodule
+        run: git submodule update --init
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.13.1'
+          cache: 'npm'
+
+      - name: Install all dependencies
+        run: npm ci
+
+      - name: Build project
+        run: npm run build
+
+      - name: Install production dependencies only
+        run: |
+          npm ci --production
+
+      - name: Create release tarball
+        run: |
+          tar -czf release.tar.gz dist/ package.json server.js node_modules/
+
+      - name: Upload build artifact (for workflow logs)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Create GitHub Release and upload asset
+        uses: ncipollo/release-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: v${{ github.run_number }}
+          name: Release ${{ github.run_number }}
+          body: |
+            Latest build from main branch.
+          artifacts: release.tar.gz
+          allowUpdates: false
+          draft: false
+          prerelease: false
+          makeLatest: true
