@@ -21,6 +21,8 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "katex": "^0.16.11",
+    "mathjs": "^12.4.1",
     "ws": "^8.14.2"
   },
   "devDependencies": {

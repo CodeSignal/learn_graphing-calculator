@@ -1,0 +1,45 @@
+{
+  "topic": "derivatives",
+  "title": "Multiple Elements Test",
+  "description": "Test multiple visual elements rendering simultaneously",
+  "functions": [
+    {
+      "id": "f",
+      "expression": "sin(x)",
+      "editable": false,
+      "visible": true
+    }
+  ],
+  "controls": [
+    {
+      "type": "slider",
+      "id": "x",
+      "label": "x =",
+      "min": -6.28,
+      "max": 6.28,
+      "step": 0.1,
+      "default": 1.57
+    }
+  ],
+  "visualElements": [
+    {
+      "type": "vertical-line",
+      "xControl": "x",
+      "color": "#ff6b35",
+      "width": 2
+    },
+    {
+      "type": "tangent-line",
+      "linkedTo": "f",
+      "pointControl": "x",
+      "color": "#10b981",
+      "width": 2
+    }
+  ],
+  "viewWindow": {
+    "xMin": -6.28,
+    "xMax": 6.28,
+    "yMin": -2,
+    "yMax": 2
+  }
+}

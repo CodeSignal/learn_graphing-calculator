@@ -1,0 +1,71 @@
+{
+  "topic": "limits",
+  "title": "Limits Explorer - Removable Discontinuity",
+  "description": "Explore the limit of (x²-4)/(x-2) as x approaches 2. Notice the hole in the graph at x=2. What value does the function approach?",
+
+  "functions": [
+    {
+      "id": "f",
+      "expression": "(x^2 - 4) / (x - 2)",
+      "editable": false,
+      "visible": true
+    }
+  ],
+
+  "controls": [
+    {
+      "type": "slider",
+      "id": "approach",
+      "label": "Approach x =",
+      "min": -5,
+      "max": 5,
+      "step": 0.1,
+      "default": 2
+    },
+    {
+      "type": "slider",
+      "id": "delta",
+      "label": "Delta (δ)",
+      "min": 0.01,
+      "max": 2,
+      "step": 0.01,
+      "default": 0.5
+    },
+    {
+      "type": "dropdown",
+      "id": "example",
+      "label": "Example",
+      "options": [
+        "(x^2 - 4) / (x - 2)",
+        "sin(x) / x",
+        "1 / x",
+        "abs(x) / x"
+      ],
+      "default": "(x^2 - 4) / (x - 2)"
+    }
+  ],
+
+  "visualElements": [
+    {
+      "type": "vertical-line",
+      "xControl": "approach",
+      "color": "#ff6b35",
+      "dasharray": "5,5"
+    },
+    {
+      "type": "limit-line",
+      "functionId": "f",
+      "approachControl": "approach",
+      "color": "#10b981",
+      "width": 2,
+      "showLabel": true
+    }
+  ],
+
+  "viewWindow": {
+    "xMin": -5,
+    "xMax": 5,
+    "yMin": -5,
+    "yMax": 10
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "topic": "functions",
+  "functions": [
+    {
+      "id": "f",
+      "expression": "a * sqrt(x - h) + k",
+      "editable": false,
+      "visible": true
+    }
+  ],
+  "controls": [
+    {
+      "type": "slider",
+      "id": "a",
+      "label": "Amplitude (a)",
+      "min": -5,
+      "max": 5,
+      "step": 0.1,
+      "default": 1
+    },
+    {
+      "type": "slider",
+      "id": "h",
+      "label": "Horizontal Shift (h)",
+      "min": -5,
+      "max": 5,
+      "step": 0.1,
+      "default": 0
+    },
+    {
+      "type": "slider",
+      "id": "k",
+      "label": "Vertical Shift (k)",
+      "min": -5,
+      "max": 5,
+      "step": 0.1,
+      "default": 0
+    }
+  ],
+
+  "visualElements": [],
+
+  "viewWindow": {
+    "xMin": -2,
+    "xMax": 10,
+    "yMin": -5,
+    "yMax": 5
+  },
+
+  "gridLines": true,
+  "axes": true,
+  "legend": true
+}
+

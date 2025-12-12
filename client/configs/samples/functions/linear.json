@@ -1,0 +1,45 @@
+{
+  "topic": "functions",
+  "functions": [
+    {
+      "id": "f",
+      "expression": "m*x + b",
+      "editable": false,
+      "visible": true
+    }
+  ],
+  "controls": [
+    {
+      "type": "slider",
+      "id": "m",
+      "label": "Slope (m)",
+      "min": -5,
+      "max": 5,
+      "step": 0.1,
+      "default": 1
+    },
+    {
+      "type": "slider",
+      "id": "b",
+      "label": "Y-Intercept (b)",
+      "min": -10,
+      "max": 10,
+      "step": 0.1,
+      "default": 0
+    }
+  ],
+
+  "visualElements": [],
+
+  "viewWindow": {
+    "xMin": -10,
+    "xMax": 10,
+    "yMin": -10,
+    "yMax": 10
+  },
+
+  "gridLines": true,
+  "axes": true,
+  "legend": true
+}
+
