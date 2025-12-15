@@ -1,0 +1,179 @@
+/* Application Specific Styles */
+
+:root {
+  --canvas-bg: #ffffff;
+  --grid-color: #e0e0e0;
+  --axis-color: #666666;
+}
+
+/* Layout Overrides */
+.bespoke .main-layout {
+  display: flex !important;
+  flex-direction: row !important;
+  grid-template-columns: none !important;
+}
+
+.bespoke .content-area {
+  flex: 1;
+  width: auto !important;
+  /* Allow flex to control width */
+  min-width: 0;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --canvas-bg: #1a1a1a;
+    --grid-color: #333333;
+    --axis-color: #999999;
+  }
+}
+
+/* Ensure canvas takes full space */
+#graph-canvas {
+  background-color: var(--canvas-bg);
+  cursor: crosshair;
+}
+
+/* Expression List Item */
+.expression-item {
+  display: flex;
+  align-items: center;
+  gap: var(--UI-Spacing-spacing-s);
+  padding: var(--UI-Spacing-spacing-s);
+  border-bottom: 1px solid var(--Colors-Stroke-Default);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.expression-item:last-child {
+  border-bottom: none;
+}
+
+.expression-color {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--Colors-Stroke-Default);
+  cursor: pointer;
+}
+
+.expression-input-container {
+  flex: 1;
+  position: relative;
+  min-width: 0;
+  /* Crucial for text truncation */
+}
+
+.expression-input {
+  width: 100%;
+  font-family: 'Courier New', Courier, monospace;
+}
+
+.expression-error {
+  color: var(--Colors-Alert-Error-Default);
+  font-size: 0.8rem;
+  margin-top: var(--UI-Spacing-spacing-xxs);
+  display: none;
+}
+
+.expression-item.has-error .expression-error {
+  display: block;
+}
+
+.expression-item.has-error .expression-input {
+  border-color: var(--Colors-Alert-Error-Default);
+}
+
+/* Sliders */
+.control-item {
+  margin-bottom: var(--UI-Spacing-spacing-m);
+}
+
+.control-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: var(--UI-Spacing-spacing-xxs);
+}
+
+/* Sidebar */
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--Colors-Stroke-Default);
+  background: var(--Colors-Backgrounds-Main-Default);
+  transition: transform 0.3s ease;
+  /* Animate toggle only */
+  /* width transition makes resizing jittery, so removed it or limit to non-dragging */
+  flex-shrink: 0;
+  position: relative;
+  z-index: 20;
+  /* Min width handled by JS or here? JS is strictly controlling width style. */
+  /* But let's set a default min-width here too */
+  min-width: 0;
+  overflow: hidden !important;
+  /* Let inner sections handle scroll */
+}
+
+.sidebar.collapsed {
+  /* Using display: none or transforming? */
+  /* Transform is smoother but requires layout container to hide overflow or flex to adjust */
+  /* Simplest: */
+  display: none !important;
+}
+
+.sidebar.collapsed ~ .sidebar-resizer {
+  display: none;
+}
+
+.sidebar-resizer {
+  width: 5px;
+  background: transparent;
+  cursor: col-resize;
+  /* Flex item between sidebar and content? */
+  flex-shrink: 0;
+  z-index: 21;
+  transition: background 0.2s;
+  margin-left: -2px;
+  /* Overlap slightly? */
+}
+
+.sidebar-resizer:hover,
+.sidebar-resizer:active {
+  background: var(--Colors-Primary-Default);
+}
+
+/* Sidebar Header */
+.sidebar-header {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: var(--UI-Spacing-spacing-s);
+  border-bottom: 1px solid var(--Colors-Stroke-Default);
+  flex-shrink: 0;
+}
+
+.sidebar-toggle-btn {
+  margin: 0;
+}
+
+/* Floating Toggle Button */
+.sidebar-floating-toggle {
+  position: fixed;
+  left: 0;
+  top: 10%;
+  z-index: 100;
+  display: none;
+  border-radius: 0 var(--UI-Radius-radius-m) var(--UI-Radius-radius-m) 0;
+  padding: var(--UI-Spacing-spacing-s);
+  min-width: auto;
+  box-shadow: var(--Colors-Shadow-Soft);
+  transition: opacity 0.2s ease;
+}
+
+.sidebar-floating-toggle.visible {
+  display: block;
+}
+
+.sidebar-floating-toggle:hover {
+  opacity: 0.9;
+}

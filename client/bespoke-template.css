@@ -3,6 +3,11 @@
 /* This file provides layout, utilities, and temporary components not yet in the design system */
 
 /* ===== LAYOUT COMPONENTS ===== */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
 
 /* Bespoke wrapper for scoping */
 .bespoke {
@@ -12,6 +17,9 @@
   line-height: 1.6;
   margin: 0;
   padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
 }
 
 .bespoke * {
@@ -45,8 +53,9 @@
 /* Main Layout */
 .bespoke .main-layout {
   display: grid;
-  grid-template-columns: 300px 1fr;
-  height: calc(100% - 42px);
+  grid-template-columns: auto 1fr;
+  flex: 1;
+  min-height: 0; /* Important for flex children with overflow */
 }
 
 .bespoke .sidebar {
@@ -54,6 +63,14 @@
   overflow: auto;
   border-right: 1px solid var(--Colors-Stroke-Default);
   background: var(--Colors-Backgrounds-Main-Default);
+}
+
+/* Sidebar Section Container - non-interactive container for sidebar content */
+.bespoke .sidebar-section {
+  padding: var(--UI-Spacing-spacing-mxl);
+  border-radius: var(--UI-Radius-radius-s);
+  background: var(--Colors-Box-Background);
+  box-shadow: 0 3px 2px 0 var(--Colors-Shadow-Card);
 }
 
 .bespoke .content-area {

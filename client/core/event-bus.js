@@ -223,7 +223,7 @@ class EventBusClass {
    * @private
    */
   _generateId() {
-    return `sub_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    return `sub_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 }
 

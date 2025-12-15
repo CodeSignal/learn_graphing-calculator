@@ -1,112 +1,141 @@
-// app.js
+/**
+ * Graphing Calculator Application
+ */
+
+import StateManager from './core/state-manager.js';
+import defaultConfig from './configs/default-config.js';
 import Modal from './design-system/components/modal/modal.js';
+import GraphEngine from './graph-engine.js';
+import SidebarManager from './components/sidebar-manager.js';
+import ExpressionList from './components/expression-list.js';
 
-const status = document.getElementById('status');
-let websocket = null;
-let helpModal = null;
 
-function setStatus(msg) {
-  if (status) {
-    status.textContent = msg;
+class App {
+  constructor() {
+    this.graphEngine = null;
+    this.expressionList = null;
+
+    this.helpModal = null;
+    this.debug = false;
   }
-}
 
-// Initialize WebSocket connection
-function initializeWebSocket() {
-  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-  const host = window.location.host;
-  const wsUrl = `${protocol}//${host}/ws`;
+  /**
+   * Initialize application
+   */
+  async init() {
+    if (this.debug) {
+      console.log('[App] Initializing...');
+    }
 
-  try {
-    websocket = new WebSocket(wsUrl);
+    // Initialize Components first so we can use them if needed
+    // But State needs to be ready.
 
-    websocket.onopen = function(event) {
-      console.log('WebSocket connected');
-      setStatus('Ready (WebSocket connected)');
-    };
+    // Initialize State Management
+    await this.initState();
 
-    websocket.onmessage = function(event) {
-      try {
-        const data = JSON.parse(event.data);
-        if (data.type === 'message' && data.message) {
-          alert(data.message);
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error);
-      }
-    };
+    // Initialize Components
+    this.initComponents();
 
-    websocket.onclose = function(event) {
-      console.log('WebSocket disconnected');
-      setStatus('Ready (WebSocket disconnected)');
+    // Initialize Help Modal
+    this.initHelp();
 
-      // Attempt to reconnect after 3 seconds
-      setTimeout(() => {
-        console.log('Attempting to reconnect WebSocket...');
-        initializeWebSocket();
-      }, 3000);
-    };
+    // Set Ready Status
+    this.setStatus('Ready');
 
-    websocket.onerror = function(error) {
-      console.error('WebSocket error:', error);
-      setStatus('Ready (WebSocket error)');
-    };
-
-  } catch (error) {
-    console.error('Failed to create WebSocket connection:', error);
-    setStatus('Ready (WebSocket unavailable)');
+    if (this.debug) {
+      console.log('[App] Initialized');
+    }
   }
-}
 
-// Load help content and initialize modal
-async function initializeHelpModal() {
-  try {
-    const response = await fetch('./help-content-template.html');
-    const helpContent = await response.text();
+  /**
+   * Initialize State Manager
+   */
+  async initState() {
+    StateManager.initialize(defaultConfig);
+  }
 
-    // Create help modal with actual content
-    helpModal = Modal.createHelpModal({
-      title: 'Help / User Guide',
+  /**
+   * Initialize Components
+   */
+  initComponents() {
+    // GraphEngine (Canvas)
+    this.graphEngine = new GraphEngine('graph-canvas');
+    this.graphEngine.init();
+
+    // Initialize Sidebar Manager
+    this.sidebarManager = new SidebarManager('sidebar', 'sidebar-resizer', 'btn-toggle-sidebar', 'btn-floating-toggle-sidebar');
+    this.sidebarManager.init();
+
+    // Expression List (Sidebar)
+    this.expressionList = new ExpressionList('expression-list', 'btn-add-expression');
+    this.expressionList.init();
+
+
+
+    // Global Buttons
+    this.initGlobalControls();
+  }
+
+  /**
+   * Initialize Global Controls (Zoom, Reset)
+   */
+  initGlobalControls() {
+    document.getElementById('btn-home').addEventListener('click', () => {
+      StateManager.set('viewport', { ...defaultConfig.viewport });
+    });
+
+    document.getElementById('btn-zoom-in').addEventListener('click', () => {
+      this.graphEngine.zoom(1.2);
+    });
+
+    document.getElementById('btn-zoom-out').addEventListener('click', () => {
+      this.graphEngine.zoom(0.8);
+    });
+  }
+
+  /**
+   * Initialize Help System
+   */
+  initHelp() {
+    const helpTemplate = document.getElementById('help-content-template');
+    if (!helpTemplate) return;
+
+    const helpContent = helpTemplate.innerHTML;
+
+    this.helpModal = Modal.createHelpModal({
+      title: 'Using the Calculator',
       content: helpContent
     });
 
-    // Bind help button click handler
-    const helpButton = document.getElementById('btn-help');
-    if (helpButton) {
-      helpButton.addEventListener('click', () => {
-        helpModal.open();
+    const btnHelp = document.getElementById('btn-help');
+    if (btnHelp) {
+      btnHelp.addEventListener('click', () => {
+        this.helpModal.open();
       });
     }
+  }
 
-    setStatus('Ready');
-  } catch (error) {
-    console.error('Failed to load help content:', error);
-    // Fallback to placeholder content
-    helpModal = Modal.createHelpModal({
-      title: 'Help / User Guide',
-      content: '<p>Help content could not be loaded. Please check that help-content-template.html exists.</p>'
-    });
 
-    // Bind help button click handler
-    const helpButton = document.getElementById('btn-help');
-    if (helpButton) {
-      helpButton.addEventListener('click', () => {
-        helpModal.open();
-      });
-    }
 
-    setStatus('Ready (help content unavailable)');
+
+  /**
+   * Update Status Bar
+   */
+  setStatus(msg) {
+    const el = document.getElementById('status');
+    if (el) el.textContent = msg;
+  }
+
+  /**
+   * Enable or disable debug mode
+   * @param {boolean} enabled - Whether debug mode should be enabled
+   */
+  setDebug(enabled) {
+    this.debug = enabled;
   }
 }
 
-// Initialize both help modal and WebSocket when DOM is ready
-async function initialize() {
-  await initializeHelpModal();
-  initializeWebSocket();
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initialize);
-} else {
-  initialize();
-}
+// Start App
+const app = new App();
+window.app = app; // For debugging
+app.init().catch(err => console.error(err));

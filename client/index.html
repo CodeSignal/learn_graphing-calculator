@@ -1,8 +1,9 @@
 <!doctype html>
 <html lang="en">
+
 <head>
   <meta charset="utf-8" />
-  <title><!-- APP_TITLE --></title>
+  <title>CodeSignal MathGraph</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <!-- Fonts (Work Sans) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,29 +19,95 @@
   <link rel="stylesheet" href="./design-system/components/button/button.css">
   <link rel="stylesheet" href="./design-system/components/boxes/boxes.css">
   <link rel="stylesheet" href="./design-system/components/input/input.css">
+  <link rel="stylesheet" href="./design-system/components/numeric-slider/numeric-slider.css">
   <link rel="stylesheet" href="./design-system/components/dropdown/dropdown.css">
   <link rel="stylesheet" href="./design-system/components/tags/tags.css">
   <link rel="stylesheet" href="./design-system/components/modal/modal.css">
+  <link rel="stylesheet" href="./design-system/components/icons/icons.css">
 
   <!-- Template-specific components (layout, utilities, temporary components) -->
   <link rel="stylesheet" href="./bespoke-template.css" />
-  <!-- APP_SPECIFIC_CSS -->
+  <link rel="stylesheet" href="./app.css">
 </head>
+
 <body class="bespoke">
   <!-- Navigation Header -->
   <header class="header">
-    <h1>APP NAME</h1>
-    <!-- APP_SPECIFIC_HEADER_CONTENT -->
+    <h1>CodeSignal MathGraph</h1>
     <div class="spacer"></div>
     <div id="status" class="status">Ready</div>
     <button id="btn-help" class="button button-text">Help</button>
   </header>
 
   <!-- Main Application Content -->
-  <!-- APP_SPECIFIC_MAIN_CONTENT -->
+  <main class="main-layout" style="overflow: hidden;"> <!-- Prevent scrolling on main layout -->
+    <aside id="sidebar" class="sidebar" style="width: 300px;">
+      <!-- Sidebar Header -->
+      <header class="sidebar-header">
+        <button id="btn-toggle-sidebar" class="button button-secondary sidebar-toggle-btn" aria-label="Toggle sidebar">&lt;&lt;</button>
+      </header>
+
+      <!-- Expression List -->
+      <section class="sidebar-section" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
+        <div id="expression-list" style="flex: 1; overflow-y: auto;">
+          <!-- Expressions will be injected here -->
+        </div>
+        <button class="button button-tertiary" id="btn-add-expression"
+          style="width: 100%; margin-top: var(--UI-Spacing-spacing-m);">
+          + Add Expression
+        </button>
+      </section>
+
+    </aside>
+    <div id="sidebar-resizer" class="sidebar-resizer"></div>
+
+    <!-- Floating Toggle Button (shown when sidebar is collapsed) -->
+    <button id="btn-floating-toggle-sidebar" class="button button-secondary sidebar-floating-toggle" aria-label="Show sidebar">&gt;&gt;</button>
+
+    <div class="content-area" style="padding: 0; position: relative;">
+      <!-- Toolbar for Canvas -->
+      <div id="graph-toolbar"
+        style="position: absolute; top: 1rem; right: 1rem; z-index: 10; display: flex; gap: 0.5rem;">
+        <button class="button button-secondary" id="btn-home" aria-label="Reset View">⟲</button>
+        <button class="button button-secondary" id="btn-zoom-in" aria-label="Zoom In">+</button>
+        <button class="button button-secondary" id="btn-zoom-out" aria-label="Zoom Out">-</button>
+      </div>
+
+      <canvas id="graph-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
+
+      <!-- Trace / Cursor Info -->
+      <div id="cursor-info"
+        style="position: absolute; bottom: 1rem; left: 1rem; background: var(--Colors-Box-Background); padding: var(--UI-Spacing-spacing-s); border-radius: var(--UI-Radius-radius-m); box-shadow: var(--Colors-Shadow-Soft); pointer-events: none; opacity: 0.8; font-family: monospace;">
+        x: 0.00, y: 0.00
+      </div>
+    </div>
+  </main>
+
+  <!-- Help Content Template (Hidden) -->
+  <template id="help-content-template"> <!-- moved here for consistency -->
+    <h2>Using the Calculator</h2>
+    <p>Enter mathematical expressions using <b>x</b> as the variable.</p>
+
+    <h3>Examples</h3>
+    <ul>
+      <li><code>sin(x)</code></li>
+      <li><code>x^2 + 5</code></li>
+      <li><code>abs(x)</code></li>
+    </ul>
+
+    <h3>Parameters</h3>
+    <p>You can use variables like <code>a</code>, <code>b</code>, etc., to create sliders.</p>
+    <ul>
+      <li><code>a * sin(b * x)</code></li>
+    </ul>
+
+    <h3>Navigation</h3>
+    <p>Drag to pan, scroll to zoom.</p>
+  </template>
 
   <!-- Core Scripts -->
   <script type="module" src="./app.js"></script>
   <!-- APP_SPECIFIC_SCRIPTS -->
 </body>
+
 </html>

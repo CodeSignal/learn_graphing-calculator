@@ -22,6 +22,8 @@ export default class ExpressionParser {
   constructor() {
     this.cache = new Map();
     this.maxCacheSize = 100;
+    this.cacheHits = 0;
+    this.cacheMisses = 0;
     this.debug = false;
   }
 
@@ -78,11 +80,14 @@ export default class ExpressionParser {
     const cacheKey = `${expression}:${variables.join(',')}`;
 
     if (this.cache.has(cacheKey)) {
+      this.cacheHits++;
       if (this.debug) {
         console.log(`[ExpressionParser] Cache hit for: ${expression}`);
       }
       return this.cache.get(cacheKey);
     }
+
+    this.cacheMisses++;
 
     try {
       // Parse expression using math.js
@@ -200,6 +205,26 @@ export default class ExpressionParser {
   }
 
   /**
+   * Get all variables from an expression (including parameters like a, b, etc.)
+   * Excludes constants and function names, but includes all variable symbols.
+   * @param {string} expression - Mathematical expression to analyze
+   * @returns {string[]} Array of all variable names found in expression
+   */
+  getAllVariables(expression) {
+    if (!expression || typeof expression !== 'string') {
+      return [];
+    }
+
+    try {
+      const node = math.parse(expression);
+      return this._extractVariables(node);
+    } catch (error) {
+      // If parsing fails, return empty array
+      return [];
+    }
+  }
+
+  /**
    * Extract variables from parsed expression
    * @private
    */
@@ -249,6 +274,8 @@ export default class ExpressionParser {
    */
   clearCache() {
     this.cache.clear();
+    this.cacheHits = 0;
+    this.cacheMisses = 0;
 
     if (this.debug) {
       console.log('[ExpressionParser] Cache cleared');
