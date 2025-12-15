@@ -30,6 +30,11 @@ Math correctness is the product; tread carefully. Update this file whenever you 
 - New calculus features: add to `calculus-engine.js`, ensure they interoperate with ExpressionParser
   and FunctionEvaluator, and document here plus root AGENTS.
 
+## Testing
+- Unit tests: `tests/unit/math/expression-parser.test.js` covers ExpressionParser with Vitest. Run with `npm run test` or `npm run test:run`.
+- Test coverage includes: parsing, variable detection, caching, error handling, evaluation, and all public methods.
+- When modifying math behavior, update/add tests to maintain coverage.
+
 ## Documentation rule
 - Any math-layer change (API, defaults, precision, supported syntax) must be recorded here and in root
   `AGENTS.md`.

@@ -52,10 +52,11 @@ This repository contains CodeSignal MathGraph, a math graphing app with live can
 - Quick start (prod): `npm start`
 - WebSocket broadcast (optional, requires `ws`): `curl -X POST http://localhost:3000/message -H "Content-Type: application/json" -d '{"message":"Hi"}'`
 
-## Testing & QA (manual for now)
-- Smoke: run `npm run start:dev`, open `http://localhost:3000`, add/edit expressions, confirm canvas redraws, sliders appear for parameters (e.g., `a*sin(b*x)`), zoom/pan, help modal opens, status shows Ready.
-- Prod sanity: `npm run build && npm run start:prod`, hit `http://localhost:3000`, ensure assets load from `dist/`.
-- No automated tests exist—add them if you introduce risky math/engine changes.
+## Testing & QA
+- **Automated tests**: Unit tests for math layer (e.g., `expression-parser.test.js`) run with `npm run test` or `npm run test:run`. Use Vitest; test files use `*.test.js` pattern in `client/` directory.
+- **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`, add/edit expressions, confirm canvas redraws, sliders appear for parameters (e.g., `a*sin(b*x)`), zoom/pan, help modal opens, status shows Ready.
+- **Prod sanity**: `npm run build && npm run start:prod`, hit `http://localhost:3000`, ensure assets load from `dist/`.
+- When introducing risky math/engine changes, add/update automated tests to maintain coverage.
 
 ## Security / perf notes
 - Math evaluation runs client-side via math.js; do not inject unchecked user input into new Function or eval. Keep parsing through ExpressionParser only.

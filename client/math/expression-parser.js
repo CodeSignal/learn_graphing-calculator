@@ -73,7 +73,23 @@ export default class ExpressionParser {
 
     // Auto-detect variables if not provided
     if (variables === null) {
-      variables = this.detectVariables(expression);
+      try {
+        variables = this.detectVariables(expression);
+      } catch (error) {
+        // If variable detection fails, return error object
+        return {
+          expression,
+          node: null,
+          compiled: null,
+          variables: [],
+          usedVariables: [],
+          isValid: false,
+          error: error.message,
+          evaluate: () => NaN,
+          toLatex: () => expression,
+          toString: () => expression
+        };
+      }
     }
 
     // Check cache
@@ -244,10 +260,8 @@ export default class ExpressionParser {
         ];
 
         if (!constants.includes(node.name) && !functions.includes(node.name)) {
-          // Check if it's not a function call
-          if (!parent || parent.type !== 'FunctionNode') {
-            variables.add(node.name);
-          }
+          // Add the variable (function names are already excluded above)
+          variables.add(node.name);
         }
       }
     });
