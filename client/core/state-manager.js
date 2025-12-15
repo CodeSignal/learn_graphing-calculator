@@ -46,6 +46,11 @@ class StateManagerClass {
     this.state.config = config;
     this.state.status = 'ready';
 
+    // Store graph config at top level for easy access
+    if (config.graph) {
+      this.state.graph = { ...config.graph };
+    }
+
     // Initialize controls with default values
     if (config.controls) {
       config.controls.forEach((control, index) => {

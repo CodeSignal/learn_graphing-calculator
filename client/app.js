@@ -3,6 +3,7 @@
  */
 
 import StateManager from './core/state-manager.js';
+import ConfigLoader from './core/config-loader.js';
 import defaultConfig from './configs/default-config.js';
 import Modal from './design-system/components/modal/modal.js';
 import GraphEngine from './graph-engine.js';
@@ -51,7 +52,23 @@ class App {
    * Initialize State Manager
    */
   async initState() {
-    StateManager.initialize(defaultConfig);
+    let config;
+
+    try {
+      // Try loading config from JSON file
+      config = await ConfigLoader.load('./configs/config.json');
+      if (this.debug) {
+        console.log('[App] Loaded config from config.json');
+      }
+    } catch (error) {
+      // Fallback to default-config.js
+      if (this.debug) {
+        console.log('[App] Failed to load config.json, using default-config.js:', error);
+      }
+      config = ConfigLoader.fromObject(defaultConfig);
+    }
+
+    StateManager.initialize(config);
   }
 
   /**
@@ -81,7 +98,11 @@ class App {
    */
   initGlobalControls() {
     document.getElementById('btn-home').addEventListener('click', () => {
-      StateManager.set('viewport', { ...defaultConfig.viewport });
+      // Reset to initial graph config from state
+      const initialGraph = StateManager.get('config')?.graph;
+      if (initialGraph) {
+        StateManager.set('graph', { ...initialGraph });
+      }
     });
 
     document.getElementById('btn-zoom-in').addEventListener('click', () => {

@@ -1,5 +1,4 @@
 {
-  "topic": "functions",
   "functions": [
     {
       "id": "f",
@@ -8,38 +7,13 @@
       "visible": true
     }
   ],
-  "controls": [
-    {
-      "type": "slider",
-      "id": "a",
-      "label": "Amplitude (a)",
-      "min": -5,
-      "max": 5,
-      "step": 0.1,
-      "default": 1
-    },
-    {
-      "type": "slider",
-      "id": "b",
-      "label": "Growth Rate (b)",
-      "min": -2,
-      "max": 2,
-      "step": 0.1,
-      "default": 1
-    }
-  ],
-
-  "visualElements": [],
-
-  "viewWindow": {
+  "graph": {
     "xMin": -5,
     "xMax": 5,
     "yMin": -1,
-    "yMax": 10
-  },
-
-  "gridLines": true,
-  "axes": true,
-  "legend": true
+    "yMax": 10,
+    "showGrid": true,
+    "showAxes": true,
+    "showLegend": true
+  }
 }
-

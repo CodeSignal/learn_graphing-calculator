@@ -6,12 +6,8 @@
  *
  * Config structure:
  * {
- *   topic: "functions" | "limits" | "derivatives" | "integrals" | "multivariate" | "gradients",
- *   title: string,
- *   description: string,
- *   functions: [],
- *   controls: [],
- *   visualElements: []
+ *   functions: [{id: string, expression: string, editable?: boolean, visible?: boolean}],
+ *   graph: {xMin: number, xMax: number, yMin: number, yMax: number, showGrid: boolean, showAxes: boolean, showLegend: boolean}
  * }
  *
  * Usage:
@@ -20,13 +16,11 @@
  */
 
 import EventBus from './event-bus.js';
-import ExpressionParser from '../math/expression-parser.js';
 
 class ConfigLoaderClass {
   constructor() {
     this.config = null;
     this.debug = false;
-    this.parser = new ExpressionParser();
   }
 
   /**
@@ -98,17 +92,6 @@ class ConfigLoaderClass {
       throw new Error('Config must be an object');
     }
 
-    // Required fields
-    if (!config.topic) {
-      throw new Error('Config missing required field: topic');
-    }
-
-    const validTopics = ['functions', 'limits', 'derivatives', 'integrals'];
-
-    if (!validTopics.includes(config.topic)) {
-      throw new Error(`Invalid topic: ${config.topic}. Must be one of: ${validTopics.join(', ')}`);
-    }
-
     // Validate functions array
     if (config.functions) {
       if (!Array.isArray(config.functions)) {
@@ -116,103 +99,37 @@ class ConfigLoaderClass {
       }
 
       config.functions.forEach((func, index) => {
+        if (!func.id) {
+          throw new Error(`Function at index ${index} missing required field: id`);
+        }
         if (!func.expression) {
           throw new Error(`Function at index ${index} missing required field: expression`);
         }
       });
     }
 
-    // Validate controls array
-    if (config.controls) {
-      if (!Array.isArray(config.controls)) {
-        throw new Error('Config.controls must be an array');
+    // Validate graph object
+    if (config.graph) {
+      if (typeof config.graph !== 'object') {
+        throw new Error('Config.graph must be an object');
       }
 
-      config.controls.forEach((control, index) => {
-        this._validateControl(control, index);
-      });
-    }
-
-    // Validate visual elements array
-    if (config.visualElements) {
-      if (!Array.isArray(config.visualElements)) {
-        throw new Error('Config.visualElements must be an array');
+      const requiredGraphFields = ['xMin', 'xMax', 'yMin', 'yMax'];
+      for (const field of requiredGraphFields) {
+        if (typeof config.graph[field] !== 'number') {
+          throw new Error(`Config.graph missing required numeric field: ${field}`);
+        }
       }
 
-      config.visualElements.forEach((element, index) => {
-        this._validateVisualElement(element, index);
-      });
+      const booleanGraphFields = ['showGrid', 'showAxes', 'showLegend'];
+      for (const field of booleanGraphFields) {
+        if (config.graph[field] !== undefined && typeof config.graph[field] !== 'boolean') {
+          throw new Error(`Config.graph.${field} must be a boolean`);
+        }
+      }
     }
 
     return true;
-  }
-
-  /**
-   * Validate a control configuration
-   * @private
-   */
-  _validateControl(control, index) {
-    if (!control.type) {
-      throw new Error(`Control at index ${index} missing required field: type`);
-    }
-
-    const validTypes = ['slider', 'input', 'toggle', 'dropdown', 'draggable-point', 'button'];
-
-    if (!validTypes.includes(control.type)) {
-      throw new Error(`Control at index ${index} has invalid type: ${control.type}. Must be one of: ${validTypes.join(', ')}`);
-    }
-
-    // Type-specific validation
-    switch (control.type) {
-      case 'slider':
-        if (control.min === undefined || control.max === undefined) {
-          throw new Error(`Slider control at index ${index} missing required fields: min, max`);
-        }
-        if (control.min >= control.max) {
-          throw new Error(`Slider control at index ${index} has invalid range: min must be less than max`);
-        }
-        break;
-
-      case 'dropdown':
-        if (!control.options || !Array.isArray(control.options)) {
-          throw new Error(`Dropdown control at index ${index} missing required field: options (array)`);
-        }
-        break;
-    }
-  }
-
-  /**
-   * Validate a visual element configuration
-   * @private
-   */
-  _validateVisualElement(element, index) {
-    if (!element.type) {
-      throw new Error(`Visual element at index ${index} missing required field: type`);
-    }
-
-    const validTypes = [
-      'tangent-line',
-      'secant-line',
-      'riemann-sum',
-      'point-marker',
-      'vertical-line',
-      'horizontal-line',
-      'annotation',
-      'approaching-point'
-    ];
-
-    if (!validTypes.includes(element.type)) {
-      throw new Error(`Visual element at index ${index} has invalid type: ${element.type}. Must be one of: ${validTypes.join(', ')}`);
-    }
-
-    // Validate references (array indices)
-    if (element.linkedTo !== undefined && typeof element.linkedTo !== 'number') {
-      throw new Error(`Visual element at index ${index} has invalid linkedTo: must be a number (array index)`);
-    }
-
-    if (element.pointControl !== undefined && typeof element.pointControl !== 'number') {
-      throw new Error(`Visual element at index ${index} has invalid pointControl: must be a number (array index)`);
-    }
   }
 
   /**
@@ -221,67 +138,36 @@ class ConfigLoaderClass {
    */
   _applyDefaults(config) {
     const defaults = {
-      title: 'Calculus Activity',
-      description: '',
       functions: [],
-      controls: [],
-      visualElements: [],
-      viewWindow: {
+      graph: {
         xMin: -10,
         xMax: 10,
         yMin: -10,
-        yMax: 10
-      },
-      gridLines: true,
-      axes: true,
-      legend: true
+        yMax: 10,
+        showGrid: true,
+        showAxes: true,
+        showLegend: true
+      }
     };
 
     const processedConfig = { ...defaults, ...config };
 
-    // Apply defaults to controls
-    if (processedConfig.controls) {
-      processedConfig.controls = processedConfig.controls.map((control, index) => ({
-        id: control.id || `control_${index}`,
-        label: control.label || `Control ${index + 1}`,
-        ...control
-      }));
+    // Merge graph defaults
+    if (processedConfig.graph) {
+      processedConfig.graph = { ...defaults.graph, ...processedConfig.graph };
     }
 
     // Apply defaults to functions
     if (processedConfig.functions) {
       processedConfig.functions = processedConfig.functions.map((func, index) => {
-        // Auto-detect variables from expression
-        let variables;
-        if (func.variables) {
-          // If variables are explicitly provided, use them (for backwards compatibility)
-          variables = func.variables;
-        } else {
-          // Auto-detect variables from expression
-          try {
-            variables = this.parser.detectVariables(func.expression);
-          } catch (error) {
-            throw new Error(`Function at index ${index} (${func.id || `f${index}`}): ${error.message}`);
-          }
-        }
-
         return {
           id: func.id || `f${index}`,
-          variables,
           color: this._getDefaultColor(index),
           visible: func.visible !== false,
           editable: func.editable !== false,
           ...func
         };
       });
-    }
-
-    // Apply defaults to visual elements
-    if (processedConfig.visualElements) {
-      processedConfig.visualElements = processedConfig.visualElements.map(element => ({
-        visible: element.visible !== false,
-        ...element
-      }));
     }
 
     return processedConfig;
@@ -317,91 +203,6 @@ class ConfigLoaderClass {
    */
   setDebug(enabled) {
     this.debug = enabled;
-  }
-
-  /**
-   * Create a sample config for testing
-   * @param {string} topic - Topic name
-   * @returns {Object} Sample config
-   */
-  createSample(topic = 'functions') {
-    const samples = {
-      functions: {
-        topic: 'functions',
-        title: 'Function Explorer',
-        description: 'Explore how functions behave with different transformations',
-        functions: [
-          {
-            expression: 'x^2'
-          }
-        ],
-        controls: [
-          {
-            type: 'slider',
-            id: 'a',
-            label: 'Vertical Stretch (a)',
-            min: -3,
-            max: 3,
-            step: 0.1,
-            default: 1
-          },
-          {
-            type: 'slider',
-            id: 'h',
-            label: 'Horizontal Shift (h)',
-            min: -5,
-            max: 5,
-            step: 0.1,
-            default: 0
-          }
-        ],
-        visualElements: []
-      },
-
-      limits: {
-        topic: 'limits',
-        title: 'Limits Explorer',
-        description: 'Explore how functions approach limit points',
-        functions: [
-          {
-            expression: '(x^2 - 4)/(x - 2)'
-          }
-        ],
-        controls: [
-          {
-            type: 'slider',
-            id: 'approach-point',
-            label: 'Approach x =',
-            min: -5,
-            max: 5,
-            step: 0.1,
-            default: 2
-          },
-          {
-            type: 'slider',
-            id: 'delta',
-            label: 'Delta (δ)',
-            min: 0.01,
-            max: 2,
-            step: 0.01,
-            default: 0.5
-          }
-        ],
-        visualElements: [
-          {
-            type: 'approaching-point',
-            linkedTo: 0,
-            pointControl: 0
-          },
-          {
-            type: 'vertical-line',
-            xControl: 0
-          }
-        ]
-      }
-    };
-
-    return samples[topic] || samples.functions;
   }
 }
 

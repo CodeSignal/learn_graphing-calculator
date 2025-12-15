@@ -6,14 +6,19 @@
 import StateManager from './core/state-manager.js';
 import EventBus from './core/event-bus.js';
 import FunctionEvaluator from './math/function-evaluator.js';
-import defaultConfig from './configs/default-config.js';
 
 export default class GraphEngine {
     constructor(canvasId) {
         this.canvas = document.getElementById(canvasId);
         this.ctx = this.canvas.getContext('2d');
 
-        this.viewport = { ...defaultConfig.viewport };
+        // Initialize viewport with defaults (will be synced from state.graph in init)
+        this.viewport = {
+            xMin: -10,
+            xMax: 10,
+            yMin: -10,
+            yMax: 10
+        };
         this.width = 0;
         this.height = 0;
 
@@ -46,9 +51,9 @@ export default class GraphEngine {
         // Subscribe to State
         this.unsubscribers.push(
             EventBus.subscribe('state:changed', (data) => {
-                // If viewport changed externally (e.g. reset button)
-                if (data.path === 'viewport') {
-                    this.viewport = data.value;
+                // If graph changed externally (e.g. reset button)
+                if (data.path === 'graph') {
+                    this.syncViewportFromGraph(data.value);
                     this.requestRender();
                 }
             })
@@ -77,10 +82,10 @@ export default class GraphEngine {
             })
         );
 
-        // Initial load of viewport from state if exists
-        const storedViewport = StateManager.get('viewport');
-        if (storedViewport) {
-            this.viewport = { ...storedViewport };
+        // Initial load of graph from state if exists
+        const storedGraph = StateManager.get('graph');
+        if (storedGraph) {
+            this.syncViewportFromGraph(storedGraph);
         }
 
         // Detect parameters from initial expressions
@@ -208,7 +213,31 @@ export default class GraphEngine {
     }
 
     saveViewportState() {
-        StateManager.set('viewport', { ...this.viewport });
+        // Get current graph config and update bounds
+        const currentGraph = StateManager.get('graph') || {};
+        StateManager.set('graph', {
+            ...currentGraph,
+            xMin: this.viewport.xMin,
+            xMax: this.viewport.xMax,
+            yMin: this.viewport.yMin,
+            yMax: this.viewport.yMax
+        });
+    }
+
+    /**
+     * Sync internal viewport from graph config
+     * @private
+     */
+    syncViewportFromGraph(graph) {
+        if (graph && typeof graph.xMin === 'number' && typeof graph.xMax === 'number' &&
+            typeof graph.yMin === 'number' && typeof graph.yMax === 'number') {
+            this.viewport = {
+                xMin: graph.xMin,
+                xMax: graph.xMax,
+                yMin: graph.yMin,
+                yMax: graph.yMax
+            };
+        }
     }
 
     debounceSaveViewport() {
@@ -315,7 +344,8 @@ export default class GraphEngine {
     }
 
     drawGrid() {
-        if (!defaultConfig.viewport.gridEnabled) return;
+        const graph = StateManager.get('graph');
+        if (!graph || graph.showGrid !== true) return;
 
         this.ctx.beginPath();
         this.ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim() || '#e0e0e0';
@@ -363,7 +393,8 @@ export default class GraphEngine {
     }
 
     drawAxes() {
-        if (!defaultConfig.viewport.axesEnabled) return;
+        const graph = StateManager.get('graph');
+        if (!graph || graph.showAxes !== true) return;
 
         this.ctx.beginPath();
         this.ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--axis-color').trim() || '#666666';
