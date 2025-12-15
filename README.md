@@ -11,11 +11,11 @@ This template uses the CodeSignal Design System located in `client/design-system
 - Light and dark theme support (automatic)
 - See the [design system repository](https://github.com/CodeSignal/learn_bespoke-design-system) for full documentation
 
-### 2. `client/bespoke-template.css`
-Template-specific CSS providing:
-- Layout components (header, sidebar, main-layout)
-- Utility classes (row, spacer, status)
-- Temporary components (modals, form elements) - will be replaced when design system adds them
+### 2. `client/app.css`
+Application-specific CSS providing:
+- Base layout components (header, sidebar, main-layout)
+- Utility classes (spacer)
+- Application-specific styling and overrides
 
 ### 3. `client/index.html`
 A base HTML template that includes:

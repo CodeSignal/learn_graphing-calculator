@@ -5,8 +5,7 @@ This directory holds all frontend code for MathGraph. If you add or change behav
 1. `index.html`: Declares the DS styles, base layout (header, sidebar, canvas area), and loads `app.js`. Keep placeholders minimal; app-specific changes belong in JS/CSS, not duplicated HTML.
 2. `app.js`: Bootstraps StateManager, GraphEngine, sidebar components, help modal. It is the only place that should instantiate the app; do not spin up parallel apps.
 3. CSS:
-   - `app.css`: custom overrides only when DS lacks a component; respect DS tokens and variables.
-   - `bespoke-template.css`: shared layout/utilities from template. TODO: Remove this file, compact into `app.css`.
+   - `app.css`: base layout, utilities, and custom overrides. Uses design system tokens and variables.
 
 ## Design System usage
 - Use components from `design-system/components/*` (buttons, modal, numeric-slider, dropdown, tags, input, boxes). Avoid reinventing UI. Do not modify DS assets directly.

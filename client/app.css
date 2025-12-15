@@ -1,12 +1,87 @@
 /* Application Specific Styles */
 
+/* ===== BASE LAYOUT & RESET ===== */
+html, body {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+/* Bespoke wrapper for scoping */
+.bespoke {
+  font-family: var(--body-family);
+  color: var(--Colors-Text-Body-Default);
+  background: var(--Colors-Backgrounds-Main-Default);
+  line-height: 1.6;
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.bespoke * {
+  box-sizing: border-box;
+}
+
+/* Header */
+.bespoke .header {
+  display: flex;
+  align-items: center;
+  gap: var(--UI-Spacing-spacing-ml);
+  padding: var(--UI-Spacing-spacing-s) var(--UI-Spacing-spacing-mxl);
+  border-bottom: 1px solid var(--Colors-Stroke-Default);
+  background: var(--Colors-Backgrounds-Main-Top);
+  width: 100%;
+}
+
+.bespoke .header h1 {
+  font-size: var(--Fonts-Body-Default-lg);
+  margin: 0;
+  font-weight: 600;
+  font-family: var(--heading-family);
+  color: var(--Colors-Text-Body-Strongest);
+}
+
+.bespoke .header .status {
+  font-size: var(--Fonts-Body-Default-xs);
+  color: var(--Colors-Text-Body-Medium);
+}
+
+/* Main Layout */
+.bespoke .main-layout {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  flex: 1;
+  min-height: 0; /* Important for flex children with overflow */
+}
+
+/* Sidebar Section Container */
+.bespoke .sidebar-section {
+  padding: var(--UI-Spacing-spacing-mxl);
+  border-radius: var(--UI-Radius-radius-s);
+  background: var(--Colors-Box-Background);
+  box-shadow: 0 3px 2px 0 var(--Colors-Shadow-Card);
+}
+
+.bespoke .content-area {
+  width: 100%;
+  height: 100%;
+}
+
+/* Utility Classes */
+.bespoke .spacer {
+  flex: 1;
+}
+
+/* ===== APPLICATION VARIABLES ===== */
 :root {
   --canvas-bg: #ffffff;
   --grid-color: #e0e0e0;
   --axis-color: #666666;
 }
 
-/* Layout Overrides */
+/* ===== LAYOUT OVERRIDES ===== */
 .bespoke .main-layout {
   display: flex !important;
   flex-direction: row !important;
