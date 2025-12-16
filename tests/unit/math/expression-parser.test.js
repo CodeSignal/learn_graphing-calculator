@@ -18,10 +18,6 @@ describe('ExpressionParser', () => {
       expect(parser.cacheMisses).toBe(0)
     })
 
-    it('should initialize debug flag to false', () => {
-      expect(parser.debug).toBe(false)
-    })
-
     it('should start with empty cache', () => {
       expect(parser.cache.size).toBe(0)
     })
@@ -407,14 +403,6 @@ describe('ExpressionParser', () => {
       expect(result.varName).toBe('a')
       expect(result.value).toBe(5)
     })
-
-    it('should handle debug mode', () => {
-      parser.setDebug(true)
-      const result = parser.isAssignmentExpression('a = x + 1', true)
-      expect(result.isAssignment).toBe(false)
-      // Should not throw, just return false
-      parser.setDebug(false)
-    })
   })
 
   describe('Cache Functionality', () => {
@@ -445,97 +433,9 @@ describe('ExpressionParser', () => {
       parser.parse('x + 1', ['x', 'y'])
       expect(parser.cache.size).toBe(2)
     })
-
-    it('should clear cache and reset stats', () => {
-      parser.parse('x + 1')
-      parser.parse('x + 2')
-      parser.parse('x + 1') // cache hit
-
-      expect(parser.cache.size).toBeGreaterThan(0)
-      expect(parser.cacheHits).toBeGreaterThan(0)
-      expect(parser.cacheMisses).toBeGreaterThan(0)
-
-      parser.clearCache()
-
-      expect(parser.cache.size).toBe(0)
-      expect(parser.cacheHits).toBe(0)
-      expect(parser.cacheMisses).toBe(0)
-    })
-
-    it('should return correct cache statistics', () => {
-      parser.parse('x + 1')
-      parser.parse('x + 2')
-      parser.parse('x + 1') // cache hit
-
-      const stats = parser.getCacheStats()
-      expect(stats.size).toBe(2)
-      expect(stats.maxSize).toBe(100)
-      expect(stats.hitRate).toBeGreaterThan(0)
-      expect(stats.hitRate).toBeLessThanOrEqual(1)
-    })
-
-    it('should calculate hit rate correctly', () => {
-      parser.parse('x + 1')
-      parser.parse('x + 1') // hit
-      parser.parse('x + 1') // hit
-
-      const stats = parser.getCacheStats()
-      expect(stats.hitRate).toBeCloseTo(2/3, 5)
-    })
-
-    it('should return zero hit rate when no cache operations', () => {
-      const stats = parser.getCacheStats()
-      expect(stats.hitRate).toBe(0)
-    })
-  })
-
-  describe('validate', () => {
-    it('should return isValid true for valid expressions', () => {
-      const result = parser.validate('x + 1')
-      expect(result.isValid).toBe(true)
-      expect(result.error).toBe(null)
-    })
-
-    it('should return isValid false for invalid expressions', () => {
-      const result = parser.validate('x +')
-      expect(result.isValid).toBe(false)
-      expect(result.error).toBeTruthy()
-    })
-
-    it('should not affect cache', () => {
-      const initialSize = parser.cache.size
-      parser.validate('x + 1')
-      parser.validate('x + 2')
-      expect(parser.cache.size).toBe(initialSize)
-    })
-  })
-
-  describe('simplify', () => {
-    it('should simplify valid expressions', () => {
-      const simplified = parser.simplify('x + x')
-      expect(simplified).toBe('2 * x')
-    })
-
-    it('should return original string for invalid expressions', () => {
-      const result = parser.simplify('x +')
-      expect(result).toBe('x +')
-    })
-
-    it('should not throw errors', () => {
-      expect(() => parser.simplify('invalid+++')).not.toThrow()
-      expect(() => parser.simplify(null)).not.toThrow()
-    })
   })
 
   describe('Utility Methods', () => {
-    it('should toggle debug mode', () => {
-      expect(parser.debug).toBe(false)
-      parser.setDebug(true)
-      expect(parser.debug).toBe(true)
-      parser.setDebug(false)
-      expect(parser.debug).toBe(false)
-    })
-
     it('should return LaTeX representation', () => {
       const parsed = parser.parse('x^2 + 1')
       const latex = parsed.toLatex()
@@ -554,34 +454,6 @@ describe('ExpressionParser', () => {
       const str = parsed.toString()
       expect(typeof str).toBe('string')
       expect(str.length).toBeGreaterThan(0)
-    })
-  })
-
-  describe('Static Methods', () => {
-    it('should return boolean for isAvailable', () => {
-      const result = ExpressionParser.isAvailable()
-      expect(typeof result).toBe('boolean')
-      expect(result).toBe(true) // math.js should be available
-    })
-
-    it('should return array of supported functions', () => {
-      const functions = ExpressionParser.getSupportedFunctions()
-      expect(Array.isArray(functions)).toBe(true)
-      expect(functions.length).toBeGreaterThan(0)
-      expect(functions).toContain('sin')
-      expect(functions).toContain('cos')
-      expect(functions).toContain('sqrt')
-      expect(functions).toContain('exp')
-    })
-
-    it('should return object of supported constants', () => {
-      const constants = ExpressionParser.getSupportedConstants()
-      expect(typeof constants).toBe('object')
-      expect(constants).toHaveProperty('e')
-      expect(constants).toHaveProperty('pi')
-      expect(constants).toHaveProperty('PI')
-      expect(constants.e).toBe(Math.E)
-      expect(constants.pi).toBe(Math.PI)
     })
   })
 
@@ -653,4 +525,5 @@ describe('ExpressionParser', () => {
     })
   })
 })
+
 

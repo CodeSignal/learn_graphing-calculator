@@ -159,16 +159,6 @@ html, body {
   border-color: var(--Colors-Alert-Error-Default);
 }
 
-/* Sliders */
-.control-item {
-  margin-bottom: var(--UI-Spacing-spacing-m);
-}
-
-.control-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: var(--UI-Spacing-spacing-xxs);
-}
 
 /* Sidebar */
 .sidebar {
