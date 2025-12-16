@@ -144,6 +144,50 @@ html, body {
   font-family: 'Courier New', Courier, monospace;
 }
 
+.expression-latex {
+  width: 100%;
+  height: var(--UI-Input-md);
+  padding: var(--UI-Spacing-spacing-s) var(--UI-Spacing-spacing-s);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--UI-Spacing-spacing-xs);
+  flex-shrink: 0;
+  border-radius: var(--UI-Radius-radius-s);
+  background: var(--Colors-Input-Background-Default);
+  border: 1px solid var(--Colors-Input-Border-Default);
+  color: var(--Colors-Input-Text-Default);
+  font-family: var(--body-family);
+  font-size: var(--Fonts-Body-Default-lg);
+  font-style: normal;
+  font-weight: 400;
+  line-height: 145%;
+  letter-spacing: -0.16px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  word-break: break-word;
+  transition: border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.expression-latex:hover {
+  border-color: var(--Colors-Input-Border-Hover);
+  opacity: 0.9;
+}
+
+.expression-latex-empty {
+  color: var(--Colors-Input-Text-Placeholder);
+  font-style: normal;
+}
+
+.expression-latex .katex {
+  font-size: 1em;
+  line-height: 1.5;
+}
+
+.expression-latex .katex-display {
+  margin: 0;
+}
+
 .expression-error {
   color: var(--Colors-Alert-Error-Default);
   font-size: 0.8rem;

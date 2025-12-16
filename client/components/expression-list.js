@@ -7,13 +7,14 @@ import StateManager from '../core/state-manager.js';
 import EventBus from '../core/event-bus.js';
 import NumericSlider from '../design-system/components/numeric-slider/numeric-slider.js';
 import ExpressionParser from '../math/expression-parser.js';
+import { toLatex, renderLatex } from '../utils/math-formatter.js';
 
 export default class ExpressionList {
     constructor(containerId, addButtonId) {
         this.container = document.getElementById(containerId);
         this.addButton = document.getElementById(addButtonId);
         this.boundRender = this.render.bind(this);
-        this.renderedItems = new Map(); // id -> { element, slider, inputEl, colorEl, errorEl, sliderContainer, lastColor, varName }
+        this.renderedItems = new Map(); // id -> { element, slider, inputEl, latexEl, colorEl, errorEl, sliderContainer, lastColor, varName, isEditing }
         this.unsubscribers = [];
         this.debug = false;
         this.parser = new ExpressionParser();
@@ -136,6 +137,78 @@ export default class ExpressionList {
     }
 
     /**
+     * Switch to input editing mode
+     * @param {string} id - Function ID
+     */
+    switchToInputMode(id) {
+        const item = this.renderedItems.get(id);
+        if (!item || item.isEditing) return;
+
+        item.isEditing = true;
+        item.latexEl.style.display = 'none';
+        item.inputEl.style.display = 'block';
+        item.inputEl.focus();
+        // Select all text for easy replacement
+        item.inputEl.select();
+    }
+
+    /**
+     * Switch to LaTeX display mode
+     * @param {string} id - Function ID
+     */
+    switchToLatexDisplay(id) {
+        const item = this.renderedItems.get(id);
+        if (!item || !item.isEditing) return;
+
+        item.isEditing = false;
+        item.inputEl.style.display = 'none';
+        item.latexEl.style.display = 'block';
+
+        // Update LaTeX display with current expression
+        const expression = item.inputEl.value;
+        item.lastExpression = expression;
+        this.updateLatexDisplay(item, expression);
+    }
+
+    /**
+     * Update LaTeX display for an expression
+     * @param {Object} item - Item data from renderedItems Map
+     * @param {string} expression - Expression string
+     */
+    updateLatexDisplay(item, expression) {
+        if (!item.latexEl) return;
+
+        // Clear previous content
+        item.latexEl.innerHTML = '';
+
+        if (!expression || expression.trim() === '') {
+            // Show placeholder for empty expressions
+            item.latexEl.textContent = 'Enter expression...';
+            item.latexEl.classList.add('expression-latex-empty');
+            return;
+        }
+
+        item.latexEl.classList.remove('expression-latex-empty');
+
+        try {
+            // Convert expression to LaTeX
+            const latex = toLatex(expression);
+
+            // Render LaTeX
+            if (latex) {
+                renderLatex(latex, item.latexEl);
+            } else {
+                // Fallback to plain text if LaTeX conversion fails
+                item.latexEl.textContent = expression;
+            }
+        } catch (error) {
+            // Fallback to plain text on error
+            console.warn('[ExpressionList] LaTeX rendering failed, using plain text:', error);
+            item.latexEl.textContent = expression;
+        }
+    }
+
+    /**
      * Create a new expression item
      * @param {Object} func - Function object
      * @param {number} index - Index in the list
@@ -149,7 +222,8 @@ export default class ExpressionList {
         <div class="expression-color" style="background-color: ${func.color};" title="Toggle Visibility"></div>
         <div class="expression-main" style="flex: 1;">
             <div class="expression-input-container">
-                <input type="text" class="expression-input input" value="${this.escapeHtml(func.expression)}" placeholder="Enter expression..." data-id="${func.id}">
+                <div class="expression-latex" data-id="${func.id}"></div>
+                <input type="text" class="expression-input input" value="${this.escapeHtml(func.expression)}" placeholder="Enter expression..." data-id="${func.id}" style="display: none;">
                 <div class="expression-error">${this.escapeHtml(func.error || '')}</div>
             </div>
             <div class="expression-slider-container" id="slider-container-${func.id}"></div>
@@ -159,6 +233,7 @@ export default class ExpressionList {
 
         // Get references to DOM elements
         const input = item.querySelector('.expression-input');
+        const latexEl = item.querySelector('.expression-latex');
         const colorBtn = item.querySelector('.expression-color');
         const deleteBtn = item.querySelector('button[data-id]');
         const errorEl = item.querySelector('.expression-error');
@@ -166,7 +241,19 @@ export default class ExpressionList {
 
         // Event Listeners
         input.addEventListener('input', (e) => {
+            const item = this.renderedItems.get(func.id);
+            if (item) {
+                item.lastExpression = e.target.value;
+            }
             this.updateExpression(func.id, e.target.value);
+        });
+
+        input.addEventListener('blur', () => {
+            this.switchToLatexDisplay(func.id);
+        });
+
+        latexEl.addEventListener('click', () => {
+            this.switchToInputMode(func.id);
         });
 
         colorBtn.addEventListener('click', () => {
@@ -181,12 +268,15 @@ export default class ExpressionList {
         const itemData = {
             element: item,
             inputEl: input,
+            latexEl: latexEl,
             colorEl: colorBtn,
             errorEl: errorEl,
             sliderContainer: sliderContainer,
             slider: null,
             lastColor: func.color,
-            varName: null
+            varName: null,
+            isEditing: !func.expression || func.expression.trim() === '',
+            lastExpression: func.expression
         };
 
         this.renderedItems.set(func.id, itemData);
@@ -194,6 +284,19 @@ export default class ExpressionList {
         // Apply initial state
         this.updateVisibilityState(itemData, func.visible);
         this.updateErrorState(itemData, func.error);
+
+        // Set initial display mode
+        if (itemData.isEditing) {
+            // Start in input mode for empty expressions
+            latexEl.style.display = 'none';
+            input.style.display = 'block';
+            input.focus();
+        } else {
+            // Start in LaTeX display mode for existing expressions
+            latexEl.style.display = 'block';
+            input.style.display = 'none';
+            this.updateLatexDisplay(itemData, func.expression);
+        }
 
         // Check for parameter definition and create slider if needed
         this.reconcileSlider(func, itemData);
@@ -215,6 +318,12 @@ export default class ExpressionList {
         this.updateInputValue(item, func.expression);
         this.updateErrorState(item, func.error);
         this.updateVisibilityState(item, func.visible);
+
+        // Update LaTeX display if expression changed and not currently editing
+        if (!item.isEditing && item.lastExpression !== func.expression) {
+            item.lastExpression = func.expression;
+            this.updateLatexDisplay(item, func.expression);
+        }
 
         // Handle slider lifecycle
         this.reconcileSlider(func, item);
