@@ -70,6 +70,8 @@ export default class ExpressionList {
         if (functions.length === 0) {
             if (this.renderedItems.size === 0) {
                 this.container.innerHTML = '<div style="padding: 1rem; color: var(--color-text-weak);">No expressions added</div>';
+                // Ensure button is still visible after clearing innerHTML
+                this.ensureButtonPosition();
             }
             return;
         }
@@ -91,6 +93,9 @@ export default class ExpressionList {
 
         // 4. Reorder items to match function order
         this.reorderItems(functions);
+
+        // 5. Ensure add button is always at the end
+        this.ensureButtonPosition();
     }
 
     /**
@@ -303,6 +308,9 @@ export default class ExpressionList {
 
         // Append to container
         this.container.appendChild(item);
+
+        // Ensure button stays at the end
+        this.ensureButtonPosition();
     }
 
     /**
@@ -367,11 +375,15 @@ export default class ExpressionList {
             value: value,
             showInputs: false,
             onChange: (newValue) => {
+                // Format the value to the nearest 0.1
+                const roundedValue = Math.round(newValue / 0.1) * 0.1;
+                const formattedValue = Number(roundedValue.toFixed(1));
+
                 // Update Control State
-                StateManager.set(`controls.${varName}`, newValue, { silent: true });
+                StateManager.set(`controls.${varName}`, formattedValue, { silent: true });
 
                 // Update Expression Text to match
-                const newExpr = `${varName} = ${newValue}`;
+                const newExpr = `${varName} = ${formattedValue}`;
 
                 // Update local input value immediately for responsiveness
                 if (item.inputEl) item.inputEl.value = newExpr;
@@ -380,7 +392,7 @@ export default class ExpressionList {
                 this.updateExpression(func.id, newExpr);
 
                 // Publish event for graph
-                EventBus.publish('controls:updated', { [varName]: newValue });
+                EventBus.publish('controls:updated', { [varName]: formattedValue });
             }
         });
 
@@ -462,6 +474,9 @@ export default class ExpressionList {
 
         // Remove from map
         this.renderedItems.delete(id);
+
+        // Ensure button stays at the end
+        this.ensureButtonPosition();
     }
 
     /**
@@ -489,6 +504,19 @@ export default class ExpressionList {
             desiredOrder.forEach(el => {
                 this.container.appendChild(el);
             });
+        }
+    }
+
+    /**
+     * Ensure the add button is always positioned at the end of the container
+     */
+    ensureButtonPosition() {
+        if (!this.addButton || !this.container) return;
+
+        // If button is not the last child, move it to the end
+        const lastChild = this.container.lastElementChild;
+        if (lastChild !== this.addButton) {
+            this.container.appendChild(this.addButton);
         }
     }
 
