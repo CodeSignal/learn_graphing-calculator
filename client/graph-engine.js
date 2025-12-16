@@ -6,6 +6,7 @@
 import StateManager from './core/state-manager.js';
 import EventBus from './core/event-bus.js';
 import FunctionEvaluator from './math/function-evaluator.js';
+import ExpressionParser from './math/expression-parser.js';
 
 export default class GraphEngine {
     constructor(canvasId) {
@@ -300,11 +301,13 @@ export default class GraphEngine {
     /**
      * Detect new parameters from expressions and update controls state
      * Called outside render cycle to prevent state mutations during rendering
+     * Also auto-creates assignment expressions for newly detected parameters
      */
     detectAndUpdateParameters() {
         const functions = StateManager.get('functions') || [];
         const controls = { ...StateManager.get('controls') || {} };
         const allVars = new Set();
+        const newParams = [];
 
         // Extract all variables from all expressions
         functions.forEach(func => {
@@ -324,18 +327,65 @@ export default class GraphEngine {
         });
 
         // Add new parameters to controls if they don't exist
-        let changed = false;
+        let controlsChanged = false;
         allVars.forEach(v => {
             if (typeof controls[v] === 'undefined') {
                 controls[v] = 1.0; // Default value
-                changed = true;
+                newParams.push(v);
+                controlsChanged = true;
             }
         });
 
         // Update state only if new parameters were found
         // This triggers 'controls:updated' which will request a render
-        if (changed) {
+        if (controlsChanged) {
             StateManager.set('controls', controls);
+        }
+
+        // Auto-create assignment expressions for newly detected parameters
+        if (newParams.length > 0) {
+            this.createAssignmentExpressionsForParameters(newParams, functions);
+        }
+    }
+
+    /**
+     * Create assignment expressions for parameters that don't already have assignments
+     * @param {string[]} paramNames - Array of parameter names to create assignments for
+     * @param {Array} existingFunctions - Current functions array
+     * @private
+     */
+    createAssignmentExpressionsForParameters(paramNames, existingFunctions) {
+        const parser = new ExpressionParser();
+        const colors = ['#4A90E2', '#50E3C2', '#F5A623', '#D0021B', '#BD10E0', '#B8E986'];
+        const functionsToAdd = [];
+
+        paramNames.forEach(paramName => {
+            // Check if assignment expression already exists for this parameter
+            const hasAssignment = existingFunctions.some(func => {
+                if (!func.expression) return false;
+                const assignment = parser.isAssignmentExpression(func.expression);
+                return assignment.isAssignment && assignment.varName === paramName;
+            });
+
+            // Only create if no assignment exists
+            if (!hasAssignment) {
+                const newId = `expr_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+                const currentFunctionCount = existingFunctions.length + functionsToAdd.length;
+                const nextColor = colors[currentFunctionCount % colors.length];
+
+                functionsToAdd.push({
+                    id: newId,
+                    expression: `${paramName} = 1.0`,
+                    color: nextColor,
+                    visible: true
+                });
+            }
+        });
+
+        // Add new functions if any were created
+        if (functionsToAdd.length > 0) {
+            const currentFunctions = StateManager.get('functions') || [];
+            StateManager.set('functions', [...currentFunctions, ...functionsToAdd]);
         }
     }
 

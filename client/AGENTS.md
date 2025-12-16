@@ -17,7 +17,11 @@ This directory holds all frontend code for MathGraph. If you add or change behav
   - `state:changed` for viewport resets
   - `expression:updated` for live expression edits
 - ExpressionList publishes `expression:updated` when inputs change.
-- GraphEngine auto-adds slider controls for symbols beyond `x/y`; ensure expressions remain parsable.
+- GraphEngine detects parameters from expressions (symbols beyond `x/y`) and:
+  1. Creates entries in `controls` state for new parameters (default value: 1.0)
+  2. Auto-creates assignment expressions (e.g., `a = 1.0`) for newly detected parameters if no assignment already exists
+  3. ExpressionList then renders sliders for these assignment expressions
+- This ensures that typing expressions like `a * sin(b * x)` automatically creates sliders for `a` and `b`.
 
 ## Utilities
 - Expression detection is handled by `math/expression-parser.js` (see math layer docs). ExpressionList uses `ExpressionParser.isSingleVariable()` and `ExpressionParser.isAssignmentExpression()` for auto-converting single variables to assignments and handling assignment expressions in the UI.
@@ -25,7 +29,13 @@ This directory holds all frontend code for MathGraph. If you add or change behav
 ## Controls & expressions
 - Primary config: `configs/config.json` (loaded first). Fallback: `configs/default-config.js` (used when JSON unavailable).
 - Example configurations: `configs/samples/` contains example JSON files for reference; keep schema consistent with `config.json`.
-- When you add a new UI control, either predefine it in config or ensure GraphEngine’s variable detection handles it without render loops.
+- GraphEngine's `detectAndUpdateParameters()` automatically:
+  - Detects parameters from all expressions (variables other than `x` and `y`)
+  - Creates `controls` entries for new parameters
+  - Auto-creates assignment expressions (e.g., `a = 1.0`) for parameters that don't already have assignments
+  - Uses debouncing (300ms) to prevent rapid-fire updates during typing
+- ExpressionList renders sliders for assignment expressions, creating the UI controls for parameters.
+- When you add a new UI control, either predefine it in config or ensure GraphEngine's variable detection handles it without render loops.
 
 ## Build/run (delegated to root commands)
 - Dev: `npm run start:dev` (Vite on 3000, API on 3001 via proxy).
