@@ -9,9 +9,7 @@ This repository contains CodeSignal MathGraph, a math graphing app with live can
    - Pub/Sub: `core/event-bus.js` (namespaced events like `state:changed`, `expression:updated`).
 4. **Math layer**:
    - Parsing/validation: `math/expression-parser.js` (math.js wrapper, caches, requires `x`, optionally `y`; warns on unknown variables). Also provides `isSingleVariable()` and `isAssignmentExpression()` for single variable detection and assignment parsing (used by ExpressionList).
-   - Evaluation: `math/function-evaluator.js` (single point, ranges, discontinuities, zero finding).
-   - Calculus: `math/calculus-engine.js` (symbolic diff via math.js, numerical fallbacks, limits, Taylor series, secant/tangent).
-   - Numerics: `math/numerical-methods.js` (Riemann, trapezoid, Simpson, Newton, bisection, gradient).
+   - Evaluation: `math/function-evaluator.js` (evaluates expressions at specific points).
    - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX).
 5. **UI components**:
    - `components/expression-list.js` manages expressions (live updates publish `expression:updated`).

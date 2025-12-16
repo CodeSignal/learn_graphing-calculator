@@ -7,29 +7,18 @@ Math correctness is the product; tread carefully. Update this file whenever you 
    `getAllVariables` reveals all symbols. Also provides `isSingleVariable()` and `isAssignmentExpression()`
    for detecting single variable names (excluding x/y and constants) and assignment expressions (e.g., `a = 5`),
    extracting variable names and values. Used by ExpressionList for auto-conversion and slider management.
-2. `function-evaluator.js`: Evaluates expressions at points/ranges, detects discontinuities, finds
-   zeros, adaptive sampling, 2D grid evaluation, supports multivariate scopes.
-3. `numerical-methods.js`: Riemann/trapezoid/Simpson integrals, Newton/bisection roots, numerical
-   derivatives, interpolation, gradient.
-4. `calculus-engine.js`: Symbolic derivative via math.js, numerical fallback, limit approximation,
-   Taylor series, critical points, tangent/secant, integrate via numerical methods.
-5. `utils/math-formatter.js`: Converts expressions to LaTeX and back; renders with KaTeX.
+2. `function-evaluator.js`: Evaluates expressions at specific points. Supports multivariate scopes.
+   Used by GraphEngine for pixel-by-pixel rendering.
+3. `utils/math-formatter.js`: Converts expressions to LaTeX and back; renders with KaTeX.
 
 ## Expectations & constraints
 - Always include `x` in user expressions; GraphEngine depends on it. Additional parameters (a, b, …)
   are fine and will spawn sliders.
 - Keep parsing/evaluation through these modules—no `eval` or new Function.
-- If you change supported functions/constants, update the static helpers in `expression-parser.js`.
 - Cache sizes are small; altering them? Document memory impact here.
 
 ## Performance & accuracy
-- Avoid heavy synchronous work inside render paths; prefer coarse sampling then adaptive refinement.
-- math.js derivative can throw; calculus-engine falls back to numerical—keep both paths working.
-
-## When extending
-- New numeric methods: place in `numerical-methods.js`, export statically, document assumptions.
-- New calculus features: add to `calculus-engine.js`, ensure they interoperate with ExpressionParser
-  and FunctionEvaluator, and document here plus root AGENTS.
+- Avoid heavy synchronous work inside render paths. GraphEngine renders pixel-by-pixel using `evaluateAt()`.
 
 ## Testing
 - Unit tests: `tests/unit/math/expression-parser.test.js` covers ExpressionParser with Vitest. Run with `npm run test` or `npm run test:run`.

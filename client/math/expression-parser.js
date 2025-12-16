@@ -24,7 +24,6 @@ export default class ExpressionParser {
     this.maxCacheSize = 100;
     this.cacheHits = 0;
     this.cacheMisses = 0;
-    this.debug = false;
   }
 
   /**
@@ -97,9 +96,6 @@ export default class ExpressionParser {
 
     if (this.cache.has(cacheKey)) {
       this.cacheHits++;
-      if (this.debug) {
-        console.log(`[ExpressionParser] Cache hit for: ${expression}`);
-      }
       return this.cache.get(cacheKey);
     }
 
@@ -167,10 +163,6 @@ export default class ExpressionParser {
       // Add to cache
       this._addToCache(cacheKey, parsed);
 
-      if (this.debug) {
-        console.log(`[ExpressionParser] Parsed successfully: ${expression}`);
-      }
-
       return parsed;
     } catch (error) {
       console.error(`[ExpressionParser] Parse error for "${expression}":`, error);
@@ -187,36 +179,6 @@ export default class ExpressionParser {
         toLatex: () => expression,
         toString: () => expression
       };
-    }
-  }
-
-  /**
-   * Validate an expression without parsing
-   * @param {string} expression - Expression to validate
-   * @returns {Object} Validation result { isValid, error }
-   */
-  validate(expression) {
-    try {
-      math.parse(expression);
-      return { isValid: true, error: null };
-    } catch (error) {
-      return { isValid: false, error: error.message };
-    }
-  }
-
-  /**
-   * Simplify an expression
-   * @param {string} expression - Expression to simplify
-   * @returns {string} Simplified expression
-   */
-  simplify(expression) {
-    try {
-      const node = math.parse(expression);
-      const simplified = math.simplify(node);
-      return simplified.toString();
-    } catch (error) {
-      console.error(`[ExpressionParser] Simplify error for "${expression}":`, error);
-      return expression;
     }
   }
 
@@ -413,100 +375,4 @@ export default class ExpressionParser {
     this.cache.set(key, parsed);
   }
 
-  /**
-   * Clear expression cache
-   */
-  clearCache() {
-    this.cache.clear();
-    this.cacheHits = 0;
-    this.cacheMisses = 0;
-
-    if (this.debug) {
-      console.log('[ExpressionParser] Cache cleared');
-    }
-  }
-
-  /**
-   * Get cache statistics
-   * @returns {Object} Cache stats
-   */
-  getCacheStats() {
-    return {
-      size: this.cache.size,
-      maxSize: this.maxCacheSize,
-      hitRate: this.cacheHits / (this.cacheHits + this.cacheMisses) || 0
-    };
-  }
-
-  /**
-   * Enable or disable debug mode
-   * @param {boolean} enabled - Whether debug mode should be enabled
-   */
-  setDebug(enabled) {
-    this.debug = enabled;
-  }
-
-  /**
-   * Check if math.js is available and working
-   * @returns {boolean} Whether math.js is available
-   */
-  static isAvailable() {
-    try {
-      return typeof math !== 'undefined' && typeof math.parse === 'function';
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Get list of supported functions
-   * @returns {string[]} Array of function names
-   */
-  static getSupportedFunctions() {
-    return [
-      // Trigonometric
-      'sin', 'cos', 'tan', 'sec', 'csc', 'cot',
-      'asin', 'acos', 'atan', 'atan2',
-      'sinh', 'cosh', 'tanh',
-
-      // Exponential and logarithmic
-      'exp', 'log', 'log10', 'log2', 'ln',
-
-      // Powers and roots
-      'sqrt', 'cbrt', 'pow', 'square', 'cube',
-
-      // Rounding
-      'floor', 'ceil', 'round', 'fix',
-
-      // Absolute and sign
-      'abs', 'sign',
-
-      // Min/max
-      'min', 'max',
-
-      // Special
-      'factorial', 'gamma'
-    ];
-  }
-
-  /**
-   * Get list of supported constants
-   * @returns {Object} Object with constant names and values
-   */
-  static getSupportedConstants() {
-    return {
-      e: Math.E,
-      pi: Math.PI,
-      PI: Math.PI,
-      tau: 2 * Math.PI,
-      phi: (1 + Math.sqrt(5)) / 2, // Golden ratio
-      E: Math.E,
-      LN2: Math.LN2,
-      LN10: Math.LN10,
-      LOG2E: Math.LOG2E,
-      LOG10E: Math.LOG10E,
-      SQRT1_2: Math.SQRT1_2,
-      SQRT2: Math.SQRT2
-    };
-  }
 }
