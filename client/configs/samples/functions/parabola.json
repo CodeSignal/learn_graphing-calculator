@@ -3,7 +3,6 @@
     {
       "id": "f",
       "expression": "a*(x-h)^2 + k",
-      "editable": false,
       "visible": true
     }
   ],

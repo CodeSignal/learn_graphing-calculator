@@ -15,7 +15,7 @@ The loading happens in `client/app.js` → `initState()` → `ConfigLoader` → 
 `ConfigLoader` (`client/core/config-loader.js`) provides:
 
 - **Validation**: Validates config structure (functions array with required `id`/`expression`, graph object with numeric bounds)
-- **Defaults**: Applies default values (colors, visibility flags, editable flags, graph settings)
+- **Defaults**: Applies default values (colors, visibility flags, graph settings).
 - **Events**: Publishes `config:loaded` event after successful processing
 - **Dual Interface**:
   - `load(path)` - Loads JSON from file system
@@ -27,7 +27,7 @@ The loading happens in `client/app.js` → `initState()` → `ConfigLoader` → 
 - **Role**: Primary configuration file loaded at application startup
 - **Usage**: Actively loaded by `app.js` via `ConfigLoader.load('./configs/config.json')`
 - **Purpose**: Defines runtime state (viewport bounds, initial expressions, display settings)
-- **Schema**: `{functions: [{id, expression, editable?, visible?}], graph: {xMin, xMax, yMin, yMax, showGrid?, showAxes?, showLegend?}}`
+- **Schema**: `{functions: [{id, expression, visible?}], graph: {xMin, xMax, yMin, yMax, showGrid?, showAxes?, showLegend?}}`
 
 ### 2. `client/configs/default-config.js` (Fallback Config)
 - **Role**: Fallback configuration when `config.json` is unavailable or fails to load

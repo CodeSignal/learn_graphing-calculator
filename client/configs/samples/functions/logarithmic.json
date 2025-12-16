@@ -3,7 +3,6 @@
     {
       "id": "f",
       "expression": "a * log(x - h) + k",
-      "editable": false,
       "visible": true
     }
   ],

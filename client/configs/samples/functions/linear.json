@@ -3,7 +3,6 @@
     {
       "id": "f",
       "expression": "m*x + b",
-      "editable": false,
       "visible": true
     }
   ],

@@ -3,7 +3,6 @@
     {
       "id": "f",
       "expression": "a*x^3 + b*x^2 + c*x + d",
-      "editable": false,
       "visible": true
     }
   ],

@@ -3,7 +3,6 @@
     {
       "id": "f",
       "expression": "(a*x + b) / (c*x + d)",
-      "editable": false,
       "visible": true
     }
   ],

@@ -3,7 +3,6 @@
     {
       "id": "f",
       "expression": "a * cos(b*x + c) + d",
-      "editable": false,
       "visible": true
     }
   ],
