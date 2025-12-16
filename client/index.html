@@ -83,30 +83,78 @@
   </main>
 
   <!-- Help Content Template (Hidden) -->
-  <template id="help-content-template"> <!-- moved here for consistency -->
-    <h2>Using the Calculator</h2>
-    <p>Enter mathematical expressions using <b>x</b> as the variable.</p>
+  <template id="help-content-template">
+    <!-- Table of Contents Navigation -->
+    <nav class="toc">
+      <strong>Contents</strong>
+      <ul>
+        <li><a href="#overview">Overview</a></li>
+        <li><a href="#getting-started">Getting Started</a></li>
+        <li><a href="#features">Key Features</a></li>
+        <li><a href="#shortcuts">Shortcuts</a></li>
+      </ul>
+    </nav>
 
-    <h3>Examples</h3>
-    <ul>
-      <li><code>sin(x)</code></li>
-      <li><code>x^2 + 5</code></li>
-      <li><code>abs(x)</code></li>
-    </ul>
+    <!-- Overview Section -->
+    <section id="overview">
+      <h2>Overview</h2>
+      <p>CodeSignal MathGraph is a graphing calculator that allows you to visualize mathematical expressions. Enter mathematical expressions using <b>x</b> as the variable, and the graph will be rendered in real-time on the canvas.</p>
+    </section>
 
-    <h3>Parameters</h3>
-    <p>You can use variables like <code>a</code>, <code>b</code>, etc., to create sliders.</p>
-    <ul>
-      <li><code>a * sin(b * x)</code></li>
-    </ul>
+    <!-- Getting Started Section -->
+    <section id="getting-started">
+      <h2>Getting Started</h2>
+      <p>To begin graphing expressions:</p>
+      <ol>
+        <li>Click the <strong>+ Add Expression</strong> button in the sidebar</li>
+        <li>Enter a mathematical expression using <code>x</code> as the variable</li>
+        <li>The graph will automatically update as you type</li>
+      </ol>
 
-    <h3>Navigation</h3>
-    <p>Drag to pan, scroll to zoom.</p>
+      <h3>Examples</h3>
+      <p>Here are some example expressions you can try:</p>
+      <ul>
+        <li><code>sin(x)</code> - Sine wave</li>
+        <li><code>x^2 + 5</code> - Parabola shifted up</li>
+        <li><code>abs(x)</code> - Absolute value function</li>
+      </ul>
+    </section>
+
+    <!-- Key Features Section -->
+    <section id="features">
+      <h2>Key Features</h2>
+
+      <h3>Parameters</h3>
+      <p>You can use variables like <code>a</code>, <code>b</code>, etc., to create interactive sliders. The graph will update automatically as you adjust the slider values.</p>
+      <ul>
+        <li><code>a * sin(b * x)</code> - Creates sliders for <code>a</code> (amplitude) and <code>b</code> (frequency)</li>
+      </ul>
+    </section>
+
+    <!-- Shortcuts Section -->
+    <section id="shortcuts">
+      <h2>Shortcuts</h2>
+      <ul>
+        <li><strong>ESC</strong> - Close help modal</li>
+      </ul>
+
+      <h3>Mouse Controls</h3>
+      <ul>
+        <li><strong>Drag</strong> - Pan the graph</li>
+        <li><strong>Scroll</strong> - Zoom in/out</li>
+      </ul>
+
+      <h3>Toolbar Buttons</h3>
+      <ul>
+        <li><strong>⟲</strong> - Reset view to initial position</li>
+        <li><strong>+</strong> - Zoom in</li>
+        <li><strong>-</strong> - Zoom out</li>
+      </ul>
+    </section>
   </template>
 
   <!-- Core Scripts -->
   <script type="module" src="./app.js"></script>
-  <!-- APP_SPECIFIC_SCRIPTS -->
 </body>
 
 </html>

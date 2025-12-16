@@ -121,7 +121,7 @@ class App {
     const helpTemplate = document.getElementById('help-content-template');
     if (!helpTemplate) return;
 
-    const helpContent = helpTemplate.innerHTML;
+    const helpContent = helpTemplate.content.cloneNode(true);
 
     this.helpModal = Modal.createHelpModal({
       title: 'Using the Calculator',
