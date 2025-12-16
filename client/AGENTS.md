@@ -20,10 +20,11 @@ This directory holds all frontend code for MathGraph. If you add or change behav
 - GraphEngine auto-adds slider controls for symbols beyond `x/y`; ensure expressions remain parsable.
 
 ## Utilities
-- `utils/expression-detector.js`: Provides `isSingleVariable()` and `isAssignmentExpression()` for detecting variable names and assignment expressions (e.g., `a = 5`). Used by ExpressionList for auto-converting single variables to assignments and handling assignment expressions in the UI.
+- Expression detection is handled by `math/expression-parser.js` (see math layer docs). ExpressionList uses `ExpressionParser.isSingleVariable()` and `ExpressionParser.isAssignmentExpression()` for auto-converting single variables to assignments and handling assignment expressions in the UI.
 
 ## Controls & expressions
-- Default expressions live in `configs/default-config.js` only. Legacy JSON samples stay unused until a loader is wired; keep schema consistency if you revive them.
+- Primary config: `configs/config.json` (loaded first). Fallback: `configs/default-config.js` (used when JSON unavailable).
+- Example configurations: `configs/samples/` contains example JSON files for reference; keep schema consistent with `config.json`.
 - When you add a new UI control, either predefine it in config or ensure GraphEngine’s variable detection handles it without render loops.
 
 ## Build/run (delegated to root commands)

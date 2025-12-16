@@ -6,17 +6,17 @@
  *
  * State structure:
  * {
- *   config: {},           // Activity configuration
- *   controls: {},         // Control values by ID
+ *   config: {},           // Activity configuration (functions, graph)
+ *   controls: {},         // Runtime control values (dynamically created from expression variables)
  *   functions: [],        // Function expressions
- *   visualElements: [],   // Visual element states
+ *   graph: {},           // Graph viewport and display settings
  *   status: 'ready'       // Application status
  * }
  *
  * Usage:
- *   StateManager.set('controls.x-point', 5);
- *   StateManager.subscribe('controls.x-point', (value) => console.log(value));
- *   const value = StateManager.get('controls.x-point');
+ *   StateManager.set('controls.m', 5);
+ *   StateManager.subscribe('controls.m', (value) => console.log(value));
+ *   const value = StateManager.get('controls.m');
  */
 
 import EventBus from './event-bus.js';
@@ -27,7 +27,6 @@ class StateManagerClass {
       config: null,
       controls: {},
       functions: [],
-      visualElements: [],
       status: 'initializing',
       errors: []
     };
@@ -51,14 +50,6 @@ class StateManagerClass {
       this.state.graph = { ...config.graph };
     }
 
-    // Initialize controls with default values
-    if (config.controls) {
-      config.controls.forEach((control, index) => {
-        const controlId = control.id || `control_${index}`;
-        this.state.controls[controlId] = this._getDefaultValue(control);
-      });
-    }
-
     // Initialize functions
     if (config.functions) {
       this.state.functions = config.functions.map(f => ({
@@ -68,14 +59,8 @@ class StateManagerClass {
       }));
     }
 
-    // Initialize visual elements
-    if (config.visualElements) {
-      this.state.visualElements = config.visualElements.map(ve => ({
-        ...ve,
-        visible: ve.visible !== false,
-        data: null
-      }));
-    }
+    // Note: controls are runtime state, dynamically created by GraphEngine
+    // from expression variables (e.g., 'm', 'b' in 'm*x + b')
 
     if (this.debug) {
       console.log('[StateManager] Initialized with config:', config);
@@ -302,7 +287,6 @@ class StateManagerClass {
       config: null,
       controls: {},
       functions: [],
-      visualElements: [],
       status: 'ready',
       errors: []
     };
@@ -343,32 +327,6 @@ class StateManagerClass {
   }
 
   /**
-   * Get default value for a control
-   * @private
-   */
-  _getDefaultValue(control) {
-    switch (control.type) {
-      case 'slider':
-        return control.default !== undefined ? control.default : control.min;
-
-      case 'input':
-        return control.default || '';
-
-      case 'toggle':
-        return control.default !== undefined ? control.default : false;
-
-      case 'dropdown':
-        return control.default || (control.options && control.options[0]);
-
-      case 'draggable-point':
-        return control.default || { x: 0, y: 0 };
-
-      default:
-        return null;
-    }
-  }
-
-  /**
    * Add change to history
    * @private
    */
@@ -401,32 +359,11 @@ class StateManagerClass {
    */
   validate(path, value) {
     // Add validation logic as needed
-    // For now, basic type checking
-
+    // Controls are runtime state (dynamically created from expression variables)
+    // Basic validation: ensure controls are numbers
     if (path.startsWith('controls.')) {
-      // Validate control values against config
-      const controlId = path.split('.')[1];
-      const config = this.state.config;
-
-      if (config && config.controls) {
-        const controlConfig = config.controls.find(c => (c.id || `control_${config.controls.indexOf(c)}`) === controlId);
-
-        if (controlConfig) {
-          switch (controlConfig.type) {
-            case 'slider':
-              if (typeof value !== 'number') return false;
-              if (value < controlConfig.min || value > controlConfig.max) return false;
-              break;
-
-            case 'toggle':
-              if (typeof value !== 'boolean') return false;
-              break;
-
-            case 'dropdown':
-              if (!controlConfig.options.includes(value)) return false;
-              break;
-          }
-        }
+      if (typeof value !== 'number') {
+        return false;
       }
     }
 

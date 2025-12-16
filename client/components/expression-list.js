@@ -6,7 +6,7 @@
 import StateManager from '../core/state-manager.js';
 import EventBus from '../core/event-bus.js';
 import NumericSlider from '../design-system/components/numeric-slider/numeric-slider.js';
-import { isSingleVariable, isAssignmentExpression } from '../utils/expression-detector.js';
+import ExpressionParser from '../math/expression-parser.js';
 
 export default class ExpressionList {
     constructor(containerId, addButtonId) {
@@ -16,6 +16,7 @@ export default class ExpressionList {
         this.renderedItems = new Map(); // id -> { element, slider, inputEl, colorEl, errorEl, sliderContainer, lastColor, varName }
         this.unsubscribers = [];
         this.debug = false;
+        this.parser = new ExpressionParser();
     }
 
     init() {
@@ -224,7 +225,7 @@ export default class ExpressionList {
      * Handle auto-conversion of single variable to assignment
      * @param {Object} func - Function object
      * @param {Object} item - Item data from renderedItems Map
-     * @param {Object} singleVar - Result from isSingleVariable()
+     * @param {Object} singleVar - Result from parser.isSingleVariable()
      * @returns {boolean} True if conversion happened (should return early)
      */
     handleAutoConversion(func, item, singleVar) {
@@ -303,8 +304,8 @@ export default class ExpressionList {
      * @param {Object} item - Item data from renderedItems Map
      */
     reconcileSlider(func, item) {
-        const assignment = isAssignmentExpression(func.expression, this.debug);
-        const singleVar = isSingleVariable(func.expression);
+        const assignment = this.parser.isAssignmentExpression(func.expression, this.debug);
+        const singleVar = this.parser.isSingleVariable(func.expression);
 
         // Handle auto-conversion of single variable to assignment
         if (this.handleAutoConversion(func, item, singleVar)) {
@@ -431,7 +432,26 @@ export default class ExpressionList {
         const index = functions.findIndex(f => f.id === id);
 
         if (index !== -1) {
-            functions[index] = { ...functions[index], expression: newExpression };
+            // Validate expression and extract error
+            let error = null;
+            if (newExpression && newExpression.trim() !== '') {
+                const parser = new ExpressionParser();
+                try {
+                    // Get all variables that might be in scope (x + any controls)
+                    const controls = StateManager.get('controls') || {};
+                    const variables = ['x', ...Object.keys(controls)];
+                    const parsed = parser.parse(newExpression, variables);
+                    if (!parsed.isValid) {
+                        error = parsed.error;
+                    }
+                } catch (e) {
+                    // If parsing throws, use the error message
+                    error = e.message || 'Invalid expression';
+                }
+            }
+            // Empty expressions are allowed (no error)
+
+            functions[index] = { ...functions[index], expression: newExpression, error };
             StateManager.set('functions', functions);
             EventBus.publish('expression:updated', functions);
         }

@@ -8,18 +8,17 @@ This repository contains CodeSignal MathGraph, a math graphing app with live can
    - Central store: `core/state-manager.js` (dot-path set/get, history, validation, publishes events).
    - Pub/Sub: `core/event-bus.js` (namespaced events like `state:changed`, `expression:updated`).
 4. **Math layer**:
-   - Parsing/validation: `math/expression-parser.js` (math.js wrapper, caches, requires `x`, optionally `y`; warns on unknown variables).
+   - Parsing/validation: `math/expression-parser.js` (math.js wrapper, caches, requires `x`, optionally `y`; warns on unknown variables). Also provides `isSingleVariable()` and `isAssignmentExpression()` for single variable detection and assignment parsing (used by ExpressionList).
    - Evaluation: `math/function-evaluator.js` (single point, ranges, discontinuities, zero finding).
    - Calculus: `math/calculus-engine.js` (symbolic diff via math.js, numerical fallbacks, limits, Taylor series, secant/tangent).
    - Numerics: `math/numerical-methods.js` (Riemann, trapezoid, Simpson, Newton, bisection, gradient).
    - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX).
-   - Detection: `utils/expression-detector.js` (single variable detection, assignment parsing; used by ExpressionList).
 5. **UI components**:
    - `components/expression-list.js` manages expressions (live updates publish `expression:updated`).
    - `components/sidebar-manager.js` handles resize/toggle.
 6. **Config**:
-   - Active default: `configs/default-config.js` only. Legacy JSON samples in `configs/samples/` are
-     unused until someone wires a loader; keep schema consistent.
+   - Primary: `configs/config.json` (loaded first). Fallback: `configs/default-config.js` (used when JSON unavailable).
+   - Example configurations: `configs/samples/` contains example JSON files for reference; keep schema consistent with `config.json`.
 7. **Server/build**:
    - Dev: Vite (`npm run start:dev`) serves client on :3000, proxies API/ws to :3001.
    - Prod: `server.js` (Express-free static server + optional WebSocket broadcast). `npm run build`

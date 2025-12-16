@@ -29,7 +29,6 @@ export default class GraphEngine {
         this.frameId = null;
         this.parameterDetectionTimeout = null;
         this.saveTimeout = null;
-        this.pendingErrorUpdates = new Map(); // Track error updates to apply after render
 
         this.evaluator = new FunctionEvaluator();
 
@@ -283,9 +282,6 @@ export default class GraphEngine {
                 this.drawFunction(func, controls);
             }
         });
-
-        // Apply any error updates collected during render
-        this.applyPendingErrorUpdates();
     }
 
     /**
@@ -418,6 +414,11 @@ export default class GraphEngine {
     }
 
     drawFunction(func, controls) {
+        // Skip rendering if expression has an error
+        if (func.error) {
+            return;
+        }
+
         const scope = { ...controls }; // Base scope
 
         // Update evaluator's expression
@@ -465,47 +466,13 @@ export default class GraphEngine {
             }
 
             this.ctx.stroke();
-
-            // Collect error clear (if function previously had error)
-            if (func.error) {
-                this.pendingErrorUpdates.set(func.id, null);
-            }
-
         } catch (e) {
-            // Collect error update (don't mutate state during render)
-            this.pendingErrorUpdates.set(func.id, e.message);
+            // If evaluation fails during render, silently skip
+            // Error should have been caught during validation in ExpressionList
+            console.warn(`[GraphEngine] Evaluation error for "${func.expression}":`, e.message);
         }
     }
 
-    /**
-     * Apply error updates collected during render
-     * Called after render completes to avoid state mutations during rendering
-     */
-    applyPendingErrorUpdates() {
-        if (this.pendingErrorUpdates.size === 0) {
-            return;
-        }
-
-        const functions = [...StateManager.get('functions')];
-        let changed = false;
-
-        this.pendingErrorUpdates.forEach((error, id) => {
-            const index = functions.findIndex(f => f.id === id);
-            if (index !== -1 && functions[index].error !== error) {
-                functions[index] = { ...functions[index], error };
-                changed = true;
-            }
-        });
-
-        // Clear pending updates
-        this.pendingErrorUpdates.clear();
-
-        // Apply state update only if something changed
-        // This happens after render completes, so no render loop risk
-        if (changed) {
-            StateManager.set('functions', functions);
-        }
-    }
 
     /**
      * Clean up resources and event listeners
@@ -533,8 +500,5 @@ export default class GraphEngine {
             cancelAnimationFrame(this.frameId);
             this.frameId = null;
         }
-
-        // Clear pending error updates
-        this.pendingErrorUpdates.clear();
     }
 }
