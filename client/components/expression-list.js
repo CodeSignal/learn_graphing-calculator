@@ -374,6 +374,7 @@ export default class ExpressionList {
             step: 0.1,
             value: value,
             showInputs: false,
+            continuousUpdates: true,
             onChange: (newValue) => {
                 // Format the value to the nearest 0.1
                 const roundedValue = Math.round(newValue / 0.1) * 0.1;
