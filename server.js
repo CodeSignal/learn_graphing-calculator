@@ -25,6 +25,10 @@ if (isProduction && !fs.existsSync(DIST_DIR)) {
 // Force port 3000 in production, otherwise use PORT environment variable or default to 3000
 const PORT = isProduction ? 3000 : (process.env.PORT || 3000);
 
+// Config file path resolution
+const CONFIG_PATH_ENV = process.env.CONFIG_PATH || './config.json';
+const CONFIG_PATH = path.resolve(__dirname, CONFIG_PATH_ENV);
+
 // Track connected WebSocket clients
 const wsClients = new Set();
 
@@ -63,6 +67,32 @@ function serveFile(filePath, res) {
 
     const mimeType = getMimeType(filePath);
     res.writeHead(200, { 'Content-Type': mimeType });
+    res.end(data);
+  });
+}
+
+// Serve config file from external path
+function serveConfigFile(req, res) {
+  // Resolve the config path (from env var or default)
+  const resolvedConfigPath = path.resolve(CONFIG_PATH);
+
+  // Attempt to read the file directly - handle errors appropriately
+  fs.readFile(resolvedConfigPath, (err, data) => {
+    if (err) {
+      // File not found - return 404 so client falls back to default-config.js
+      if (err.code === 'ENOENT') {
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('Config file not found');
+        return;
+      }
+      // Other errors (permissions, I/O issues, etc.) - return 500
+      res.writeHead(500, { 'Content-Type': 'text/plain' });
+      res.end('Error reading config file');
+      return;
+    }
+
+    // Success - serve the config file
+    res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(data);
   });
 }
@@ -129,6 +159,12 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // In production mode, handle config.json requests specially
+  if (isProduction && pathName === '/configs/config.json') {
+    serveConfigFile(req, res);
+    return;
+  }
+
   // In production mode, serve static files from dist directory
   if (isProduction) {
     // Strip leading slashes so path.join/resolve can't ignore DIST_DIR
@@ -185,6 +221,15 @@ server.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);
   if (isProduction) {
     console.log(`Serving static files from: ${DIST_DIR}`);
+    console.log(`Config file path: ${CONFIG_PATH} (from ${CONFIG_PATH_ENV})`);
+    // Check if config file exists and log status
+    fs.access(CONFIG_PATH, fs.constants.F_OK, (err) => {
+      if (err) {
+        console.log(`Config file not found at ${CONFIG_PATH} - client will use default-config.js`);
+      } else {
+        console.log(`Config file found at ${CONFIG_PATH}`);
+      }
+    });
   } else {
     console.log(`Development mode - static files served by Vite`);
   }
