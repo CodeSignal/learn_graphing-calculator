@@ -1,5 +1,5 @@
 # Repository Contribution Guidelines – Client Layer
-This directory holds all frontend code for MathGraph. If you add or change behavior here, update this file. Use the design-system first; custom styling is a last resort.
+This directory holds all frontend code for CodeSignal CosmoPlot. If you add or change behavior here, update this file. Use the design-system first; custom styling is a last resort.
 
 ## Layout & entry points
 1. `index.html`: Declares the DS styles, base layout (header, sidebar, canvas area), and loads `app.js`. Keep placeholders minimal; app-specific changes belong in JS/CSS, not duplicated HTML.

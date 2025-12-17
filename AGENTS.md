@@ -1,5 +1,5 @@
-# Repository Contribution Guidelines - CodeSignal MathGraph
-This repository contains CodeSignal MathGraph, a math graphing app with live canvas rendering, auto‑generated sliders, and a lightweight Node/Vite stack. When working on this repo, start by reading this file accurately. Always update this file at the end of your work whenever you change behavior, commands, or architecture.
+# Repository Contribution Guidelines - CodeSignal CosmoPlot
+This repository contains CodeSignal CosmoPlot, a graphing calculator app with live canvas rendering, auto‑generated sliders, and a lightweight Node/Vite stack. When working on this repo, start by reading this file accurately. Always update this file at the end of your work whenever you change behavior, commands, or architecture.
 
 ## Architecture (what actually runs)
 1. **Client entry**: `client/index.html` mounts the layout, loads design-system CSS, then `client/app.js`.
