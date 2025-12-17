@@ -36,10 +36,7 @@ html, body {
 }
 
 .bespoke .header h1 {
-  font-size: var(--Fonts-Body-Default-lg);
   margin: 0;
-  font-weight: 600;
-  font-family: var(--heading-family);
   color: var(--Colors-Text-Body-Strongest);
 }
 
