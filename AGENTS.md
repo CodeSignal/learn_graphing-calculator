@@ -8,7 +8,7 @@ This repository contains CodeSignal CosmoPlot, a graphing calculator app with li
    - Central store: `core/state-manager.js` (dot-path set/get, history, validation, publishes events).
    - Pub/Sub: `core/event-bus.js` (namespaced events like `state:changed`, `expression:updated`).
 4. **Math layer**:
-   - Parsing/validation: `math/expression-parser.js` (math.js wrapper, caches, requires `x`, optionally `y`; warns on unknown variables). Also provides `isSingleVariable()` and `isAssignmentExpression()` for single variable detection and assignment parsing (used by ExpressionList).
+   - Parsing/validation: `math/expression-parser.js` (math.js wrapper, caches, requires `x`, optionally `y`; warns on unknown variables). Also provides `isParameter()` and `isAssignmentExpression()` for parameter detection and assignment parsing (used by ExpressionList).
    - Evaluation: `math/function-evaluator.js` (evaluates expressions at specific points).
    - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX).
 5. **UI components**:

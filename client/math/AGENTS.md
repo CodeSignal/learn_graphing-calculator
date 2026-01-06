@@ -4,9 +4,9 @@ Math correctness is the product; tread carefully. Update this file whenever you 
 ## Modules
 1. `expression-parser.js`: math.js wrapper, caches parsed expressions (LRU 100). Requires variable `x`
    (optionally `y`); unknown symbols are allowed but warned. `detectVariables` filters to x/y only;
-   `getAllVariables` reveals all symbols. Also provides `isSingleVariable()` and `isAssignmentExpression()`
-   for detecting single variable names (excluding x/y and constants) and assignment expressions (e.g., `a = 5`),
-   extracting variable names and values. Used by ExpressionList for auto-conversion and slider management.
+   `getAllVariables` reveals all symbols. Also provides `isParameter()` and `isAssignmentExpression()`
+   for detecting parameter names (excluding x/y and constants) and assignment expressions (e.g., `a = 5`),
+   extracting parameter names and values. Used by ExpressionList for auto-conversion and slider management.
 2. `function-evaluator.js`: Evaluates expressions at specific points. Supports multivariate scopes.
    Used by GraphEngine for pixel-by-pixel rendering.
 3. `utils/math-formatter.js`: Converts expressions to LaTeX and back; renders with KaTeX.

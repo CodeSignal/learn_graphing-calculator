@@ -15,7 +15,7 @@ export default class ExpressionList {
         this.container = document.getElementById(containerId);
         this.addButton = document.getElementById(addButtonId);
         this.boundRender = this.render.bind(this);
-        this.renderedItems = new Map(); // id -> { element, slider, inputEl, latexEl, colorEl, errorEl, sliderContainer, lastColor, varName, isEditing }
+        this.renderedItems = new Map(); // id -> { element, slider, inputEl, latexEl, colorEl, errorEl, sliderContainer, lastColor, paramName, isEditing }
         this.unsubscribers = [];
         this.debug = false;
         this.parser = new ExpressionParser();
@@ -293,7 +293,7 @@ export default class ExpressionList {
             sliderContainer: sliderContainer,
             slider: null,
             lastColor: func.color,
-            varName: null,
+            paramName: null,
             isEditing: !func.expression || func.expression.trim() === '',
             lastExpression: func.expression,
             editStartExpression: undefined // Track expression at edit start for commit-boundary logging
@@ -359,21 +359,21 @@ export default class ExpressionList {
 
 
     /**
-     * Handle auto-conversion of single variable to assignment
+     * Handle auto-conversion of parameter to assignment
      * @param {Object} func - Function object
      * @param {Object} item - Item data from renderedItems Map
-     * @param {Object} singleVar - Result from parser.isSingleVariable()
+     * @param {Object} param - Result from parser.isParameter()
      * @returns {boolean} True if conversion happened (should return early)
      */
-    handleAutoConversion(func, item, singleVar) {
-        if (!singleVar.isVariable || item.slider) return false;
+    handleAutoConversion(func, item, param) {
+        if (!param.isParameter || item.slider) return false;
 
         const isInputFocused = item.inputEl && document.activeElement === item.inputEl;
         if (isInputFocused) return false;
 
-        const varName = singleVar.varName;
+        const paramName = param.paramName;
         const defaultVal = 1.0; // Default value for new parameters (matches GraphEngine)
-        const newExpr = `${varName} = ${defaultVal}`;
+        const newExpr = `${paramName} = ${defaultVal}`;
 
         this.updateExpression(func.id, newExpr);
         return true; // Conversion happened, should return early
@@ -383,10 +383,10 @@ export default class ExpressionList {
      * Create slider for an assignment expression
      * @param {Object} func - Function object
      * @param {Object} item - Item data from renderedItems Map
-     * @param {string} varName - Variable name
+     * @param {string} paramName - Parameter name
      * @param {number} value - Initial value
      */
-    createSliderForAssignment(func, item, varName, value) {
+    createSliderForAssignment(func, item, paramName, value) {
         // Initialize slider interaction tracking
         item.sliderInteractionActive = false;
         item.sliderEditStartExpr = null;
@@ -405,10 +405,10 @@ export default class ExpressionList {
                 const formattedValue = Number(roundedValue.toFixed(1));
 
                 // Update Control State
-                StateManager.set(`controls.${varName}`, formattedValue, { silent: true });
+                StateManager.set(`controls.${paramName}`, formattedValue, { silent: true });
 
                 // Update Expression Text to match
-                const newExpr = `${varName} = ${formattedValue}`;
+                const newExpr = `${paramName} = ${formattedValue}`;
 
                 // Track slider interaction for commit-boundary logging
                 const isDragging = slider.isDragging;
@@ -438,19 +438,19 @@ export default class ExpressionList {
                 this.updateExpression(func.id, newExpr);
 
                 // Publish event for graph
-                EventBus.publish('controls:updated', { [varName]: formattedValue });
+                EventBus.publish('controls:updated', { [paramName]: formattedValue });
 
                 // Log user action on interaction end (drag end) or discrete change (non-drag)
                 if (!isDragging) {
                     if (item.sliderInteractionActive) {
                         // Drag ended - log once with start -> end
                         const oldExpr = item.sliderEditStartExpr || func.expression;
-                        this.logModified(func.id, oldExpr, newExpr, { varName });
+                        this.logModified(func.id, oldExpr, newExpr, { paramName });
                         item.sliderInteractionActive = false;
                         item.sliderEditStartExpr = null;
                     } else if (oldExprForDiscrete !== null && oldExprForDiscrete !== newExpr) {
                         // Discrete change (track click, keyboard) - log immediately
-                        this.logModified(func.id, oldExprForDiscrete, newExpr, { varName });
+                        this.logModified(func.id, oldExprForDiscrete, newExpr, { paramName });
                     }
                 }
                 // While dragging (isDragging === true), do not log - wait for drag end
@@ -458,12 +458,12 @@ export default class ExpressionList {
         });
 
         item.slider = slider;
-        item.varName = varName;
+        item.paramName = paramName;
 
         // Ensure the control exists in StateManager
-        const currentControl = StateManager.get(`controls.${varName}`);
+        const currentControl = StateManager.get(`controls.${paramName}`);
         if (currentControl === undefined || currentControl !== value) {
-            StateManager.set(`controls.${varName}`, value, { silent: true });
+            StateManager.set(`controls.${paramName}`, value, { silent: true });
         }
     }
 
@@ -475,7 +475,7 @@ export default class ExpressionList {
         if (item.slider) {
             item.slider.destroy();
             item.slider = null;
-            item.varName = null;
+            item.paramName = null;
             item.sliderContainer.innerHTML = '';
         }
     }
@@ -487,21 +487,21 @@ export default class ExpressionList {
      */
     reconcileSlider(func, item) {
         const assignment = this.parser.isAssignmentExpression(func.expression, this.debug);
-        const singleVar = this.parser.isSingleVariable(func.expression);
+        const param = this.parser.isParameter(func.expression);
 
-        // Handle auto-conversion of single variable to assignment
-        if (this.handleAutoConversion(func, item, singleVar)) {
+        // Handle auto-conversion of parameter to assignment
+        if (this.handleAutoConversion(func, item, param)) {
             return; // Conversion happened, will trigger re-render
         }
 
         // Create slider for assignment expressions
         if (assignment.isAssignment && !item.slider) {
-            this.createSliderForAssignment(func, item, assignment.varName, assignment.value);
+            this.createSliderForAssignment(func, item, assignment.paramName, assignment.value);
             return;
         }
 
         // Destroy slider if expression is no longer a parameter
-        if (!assignment.isAssignment && !singleVar.isVariable && item.slider) {
+        if (!assignment.isAssignment && !param.isParameter && item.slider) {
             this.destroySlider(item);
             return;
         }
@@ -596,8 +596,8 @@ export default class ExpressionList {
         // Update sliders if controls changed externally (optional bi-directional sync)
         const controls = StateManager.get('controls') || {};
         this.renderedItems.forEach((item, id) => {
-            if (item.slider && item.varName) {
-                const controlValue = controls[item.varName];
+            if (item.slider && item.paramName) {
+                const controlValue = controls[item.paramName];
                 if (controlValue !== undefined && !item.slider.isDragging) {
                     const currentValue = item.slider.getValue();
                     if (currentValue !== controlValue) {
@@ -715,11 +715,11 @@ export default class ExpressionList {
     }
 
     logModified(id, oldExpr, newExpr, options = {}) {
-        const varName = options.varName;
+        const paramName = options.paramName;
         const error = options.error;
         let messageBase = `Modified expression ${id}: ${oldExpr} -> ${newExpr}`;
-        if (varName) {
-            messageBase = `Modified expression ${id} (variable: ${varName}): ` +
+        if (paramName) {
+            messageBase = `Modified expression ${id} (parameter: ${paramName}): ` +
                 `${oldExpr} -> ${newExpr}`;
         }
         const message = error ? `${messageBase} (invalid: ${error})` : messageBase;

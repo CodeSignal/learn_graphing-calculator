@@ -364,7 +364,7 @@ export default class GraphEngine {
             const hasAssignment = existingFunctions.some(func => {
                 if (!func.expression) return false;
                 const assignment = parser.isAssignmentExpression(func.expression);
-                return assignment.isAssignment && assignment.varName === paramName;
+                return assignment.isAssignment && assignment.paramName === paramName;
             });
 
             // Only create if no assignment exists

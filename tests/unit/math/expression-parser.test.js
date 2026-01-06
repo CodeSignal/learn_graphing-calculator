@@ -272,58 +272,58 @@ describe('ExpressionParser', () => {
     })
   })
 
-  describe('isSingleVariable', () => {
-    it('should detect single variable names', () => {
-      const result1 = parser.isSingleVariable('a')
-      expect(result1.isVariable).toBe(true)
-      expect(result1.varName).toBe('a')
+  describe('isParameter', () => {
+    it('should detect parameter names', () => {
+      const result1 = parser.isParameter('a')
+      expect(result1.isParameter).toBe(true)
+      expect(result1.paramName).toBe('a')
 
-      const result2 = parser.isSingleVariable('b')
-      expect(result2.isVariable).toBe(true)
-      expect(result2.varName).toBe('b')
+      const result2 = parser.isParameter('b')
+      expect(result2.isParameter).toBe(true)
+      expect(result2.paramName).toBe('b')
 
-      const result3 = parser.isSingleVariable('z')
-      expect(result3.isVariable).toBe(true)
-      expect(result3.varName).toBe('z')
+      const result3 = parser.isParameter('z')
+      expect(result3.isParameter).toBe(true)
+      expect(result3.paramName).toBe('z')
     })
 
     it('should reject reserved variables x and y', () => {
-      const result1 = parser.isSingleVariable('x')
-      expect(result1.isVariable).toBe(false)
-      expect(result1.varName).toBe(null)
+      const result1 = parser.isParameter('x')
+      expect(result1.isParameter).toBe(false)
+      expect(result1.paramName).toBe(null)
 
-      const result2 = parser.isSingleVariable('y')
-      expect(result2.isVariable).toBe(false)
-      expect(result2.varName).toBe(null)
+      const result2 = parser.isParameter('y')
+      expect(result2.isParameter).toBe(false)
+      expect(result2.paramName).toBe(null)
     })
 
     it('should reject constants', () => {
       const constants = ['e', 'pi', 'PI', 'E', 'i']
       constants.forEach(constant => {
-        const result = parser.isSingleVariable(constant)
-        expect(result.isVariable).toBe(false)
-        expect(result.varName).toBe(null)
+        const result = parser.isParameter(constant)
+        expect(result.isParameter).toBe(false)
+        expect(result.paramName).toBe(null)
       })
     })
 
-    it('should reject expressions that are not single variables', () => {
-      expect(parser.isSingleVariable('a + 1')).toEqual({ isVariable: false, varName: null })
-      expect(parser.isSingleVariable('a * b')).toEqual({ isVariable: false, varName: null })
-      expect(parser.isSingleVariable('sin(a)')).toEqual({ isVariable: false, varName: null })
-      expect(parser.isSingleVariable('a = 5')).toEqual({ isVariable: false, varName: null })
+    it('should reject expressions that are not parameters', () => {
+      expect(parser.isParameter('a + 1')).toEqual({ isParameter: false, paramName: null })
+      expect(parser.isParameter('a * b')).toEqual({ isParameter: false, paramName: null })
+      expect(parser.isParameter('sin(a)')).toEqual({ isParameter: false, paramName: null })
+      expect(parser.isParameter('a = 5')).toEqual({ isParameter: false, paramName: null })
     })
 
     it('should handle invalid input', () => {
-      expect(parser.isSingleVariable(null)).toEqual({ isVariable: false, varName: null })
-      expect(parser.isSingleVariable('')).toEqual({ isVariable: false, varName: null })
-      expect(parser.isSingleVariable('   ')).toEqual({ isVariable: false, varName: null })
-      expect(parser.isSingleVariable('invalid+++')).toEqual({ isVariable: false, varName: null })
+      expect(parser.isParameter(null)).toEqual({ isParameter: false, paramName: null })
+      expect(parser.isParameter('')).toEqual({ isParameter: false, paramName: null })
+      expect(parser.isParameter('   ')).toEqual({ isParameter: false, paramName: null })
+      expect(parser.isParameter('invalid+++')).toEqual({ isParameter: false, paramName: null })
     })
 
     it('should trim whitespace', () => {
-      const result = parser.isSingleVariable('  a  ')
-      expect(result.isVariable).toBe(true)
-      expect(result.varName).toBe('a')
+      const result = parser.isParameter('  a  ')
+      expect(result.isParameter).toBe(true)
+      expect(result.paramName).toBe('a')
     })
   })
 
@@ -331,76 +331,76 @@ describe('ExpressionParser', () => {
     it('should detect simple assignment expressions', () => {
       const result1 = parser.isAssignmentExpression('a = 5')
       expect(result1.isAssignment).toBe(true)
-      expect(result1.varName).toBe('a')
+      expect(result1.paramName).toBe('a')
       expect(result1.value).toBe(5)
 
       const result2 = parser.isAssignmentExpression('b = -3.14')
       expect(result2.isAssignment).toBe(true)
-      expect(result2.varName).toBe('b')
+      expect(result2.paramName).toBe('b')
       expect(result2.value).toBeCloseTo(-3.14, 5)
     })
 
     it('should evaluate assignment expressions with calculations', () => {
       const result1 = parser.isAssignmentExpression('a = 1 + 2')
       expect(result1.isAssignment).toBe(true)
-      expect(result1.varName).toBe('a')
+      expect(result1.paramName).toBe('a')
       expect(result1.value).toBe(3)
 
       const result2 = parser.isAssignmentExpression('b = 2 * 3')
       expect(result2.isAssignment).toBe(true)
-      expect(result2.varName).toBe('b')
+      expect(result2.paramName).toBe('b')
       expect(result2.value).toBe(6)
     })
 
     it('should evaluate assignment expressions with constants', () => {
       const result = parser.isAssignmentExpression('a = pi')
       expect(result.isAssignment).toBe(true)
-      expect(result.varName).toBe('a')
+      expect(result.paramName).toBe('a')
       expect(result.value).toBeCloseTo(Math.PI, 5)
     })
 
     it('should reject reserved variables x and y', () => {
       const result1 = parser.isAssignmentExpression('x = 5')
       expect(result1.isAssignment).toBe(false)
-      expect(result1.varName).toBe(null)
+      expect(result1.paramName).toBe(null)
       expect(result1.value).toBe(null)
 
       const result2 = parser.isAssignmentExpression('y = 10')
       expect(result2.isAssignment).toBe(false)
-      expect(result2.varName).toBe(null)
+      expect(result2.paramName).toBe(null)
       expect(result2.value).toBe(null)
     })
 
     it('should reject non-assignment expressions', () => {
-      expect(parser.isAssignmentExpression('a + 1')).toEqual({ isAssignment: false, varName: null, value: null })
-      expect(parser.isAssignmentExpression('a')).toEqual({ isAssignment: false, varName: null, value: null })
-      expect(parser.isAssignmentExpression('sin(x)')).toEqual({ isAssignment: false, varName: null, value: null })
+      expect(parser.isAssignmentExpression('a + 1')).toEqual({ isAssignment: false, paramName: null, value: null })
+      expect(parser.isAssignmentExpression('a')).toEqual({ isAssignment: false, paramName: null, value: null })
+      expect(parser.isAssignmentExpression('sin(x)')).toEqual({ isAssignment: false, paramName: null, value: null })
     })
 
     it('should reject assignments with variables in value', () => {
       const result = parser.isAssignmentExpression('a = x + 1')
       expect(result.isAssignment).toBe(false)
-      expect(result.varName).toBe(null)
+      expect(result.paramName).toBe(null)
       expect(result.value).toBe(null)
     })
 
     it('should reject assignments with non-numeric values', () => {
       const result = parser.isAssignmentExpression('a = b')
       expect(result.isAssignment).toBe(false)
-      expect(result.varName).toBe(null)
+      expect(result.paramName).toBe(null)
       expect(result.value).toBe(null)
     })
 
     it('should handle invalid input', () => {
-      expect(parser.isAssignmentExpression(null)).toEqual({ isAssignment: false, varName: null, value: null })
-      expect(parser.isAssignmentExpression('')).toEqual({ isAssignment: false, varName: null, value: null })
-      expect(parser.isAssignmentExpression('invalid+++')).toEqual({ isAssignment: false, varName: null, value: null })
+      expect(parser.isAssignmentExpression(null)).toEqual({ isAssignment: false, paramName: null, value: null })
+      expect(parser.isAssignmentExpression('')).toEqual({ isAssignment: false, paramName: null, value: null })
+      expect(parser.isAssignmentExpression('invalid+++')).toEqual({ isAssignment: false, paramName: null, value: null })
     })
 
     it('should trim whitespace', () => {
       const result = parser.isAssignmentExpression('  a = 5  ')
       expect(result.isAssignment).toBe(true)
-      expect(result.varName).toBe('a')
+      expect(result.paramName).toBe('a')
       expect(result.value).toBe(5)
     })
   })

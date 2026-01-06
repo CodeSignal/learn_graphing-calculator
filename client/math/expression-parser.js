@@ -203,57 +203,57 @@ export default class ExpressionParser {
   }
 
   /**
-   * Check if an expression is just a single variable name (not x or y)
+   * Check if an expression is a parameter name (not x or y)
    * @param {string} expression - Expression string to check
-   * @returns {{isVariable: boolean, varName: string|null}} Result object
+   * @returns {{isParameter: boolean, paramName: string|null}} Result object
    */
-  isSingleVariable(expression) {
+  isParameter(expression) {
     if (!expression || typeof expression !== 'string') {
-      return { isVariable: false, varName: null };
+      return { isParameter: false, paramName: null };
     }
 
     const trimmed = expression.trim();
     if (!trimmed) {
-      return { isVariable: false, varName: null };
+      return { isParameter: false, paramName: null };
     }
 
     try {
       const node = math.parse(trimmed);
 
-      // Check if it's just a SymbolNode (single variable)
+      // Check if it's just a SymbolNode (parameter)
       if (node.type === 'SymbolNode') {
-        const varName = node.name;
+        const paramName = node.name;
 
         // Reject reserved variables x and y
-        if (varName === 'x' || varName === 'y') {
-          return { isVariable: false, varName: null };
+        if (paramName === 'x' || paramName === 'y') {
+          return { isParameter: false, paramName: null };
         }
 
-        // Check if it's a valid variable name (not a constant or function)
+        // Check if it's a valid parameter name (not a constant or function)
         const constants = this._getConstants();
-        if (constants.includes(varName)) {
-          return { isVariable: false, varName: null };
+        if (constants.includes(paramName)) {
+          return { isParameter: false, paramName: null };
         }
 
-        return { isVariable: true, varName };
+        return { isParameter: true, paramName };
       }
 
-      return { isVariable: false, varName: null };
+      return { isParameter: false, paramName: null };
     } catch (error) {
-      // Parsing failed - not a single variable
-      return { isVariable: false, varName: null };
+      // Parsing failed - not a parameter
+      return { isParameter: false, paramName: null };
     }
   }
 
   /**
-   * Check if an expression is a variable assignment using AST parsing
+   * Check if an expression is a parameter assignment using AST parsing
    * @param {string} expression - Expression string to check
    * @param {boolean} debug - Whether to log debug warnings
-   * @returns {{isAssignment: boolean, varName: string|null, value: number|null}} Result object
+   * @returns {{isAssignment: boolean, paramName: string|null, value: number|null}} Result object
    */
   isAssignmentExpression(expression, debug = false) {
     if (!expression || typeof expression !== 'string') {
-      return { isAssignment: false, varName: null, value: null };
+      return { isAssignment: false, paramName: null, value: null };
     }
 
     try {
@@ -261,21 +261,21 @@ export default class ExpressionParser {
 
       // Check if root node is an AssignmentNode
       if (node.type !== 'AssignmentNode') {
-        return { isAssignment: false, varName: null, value: null };
+        return { isAssignment: false, paramName: null, value: null };
       }
 
-      // Extract variable name from left-hand side (should be a SymbolNode)
-      let varName = null;
+      // Extract parameter name from left-hand side (should be a SymbolNode)
+      let paramName = null;
       if (node.object && node.object.type === 'SymbolNode') {
-        varName = node.object.name;
+        paramName = node.object.name;
       } else {
-        // Not a simple variable assignment (e.g., array[index] = value)
-        return { isAssignment: false, varName: null, value: null };
+        // Not a simple parameter assignment (e.g., array[index] = value)
+        return { isAssignment: false, paramName: null, value: null };
       }
 
       // Reject reserved variables x and y
-      if (varName === 'x' || varName === 'y') {
-        return { isAssignment: false, varName: null, value: null };
+      if (paramName === 'x' || paramName === 'y') {
+        return { isAssignment: false, paramName: null, value: null };
       }
 
       // Extract value from right-hand side
@@ -298,20 +298,20 @@ export default class ExpressionParser {
             if (debug) {
               console.warn(`[ExpressionParser] Could not evaluate assignment value: ${expression}`, e);
             }
-            return { isAssignment: false, varName: null, value: null };
+            return { isAssignment: false, paramName: null, value: null };
           }
         }
       }
 
-      // Only return success if we have both variable name and numeric value
-      if (varName && value !== null && isFinite(value)) {
-        return { isAssignment: true, varName, value };
+      // Only return success if we have both parameter name and numeric value
+      if (paramName && value !== null && isFinite(value)) {
+        return { isAssignment: true, paramName, value };
       }
 
-      return { isAssignment: false, varName: null, value: null };
+      return { isAssignment: false, paramName: null, value: null };
     } catch (error) {
       // Parsing failed - not an assignment or invalid expression
-      return { isAssignment: false, varName: null, value: null };
+      return { isAssignment: false, paramName: null, value: null };
     }
   }
 

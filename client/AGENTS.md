@@ -24,7 +24,7 @@ This directory holds all frontend code for CodeSignal CosmoPlot. If you add or c
 - This ensures that typing expressions like `a * sin(b * x)` automatically creates sliders for `a` and `b`.
 
 ## Utilities
-- Expression detection is handled by `math/expression-parser.js` (see math layer docs). ExpressionList uses `ExpressionParser.isSingleVariable()` and `ExpressionParser.isAssignmentExpression()` for auto-converting single variables to assignments and handling assignment expressions in the UI.
+- Expression detection is handled by `math/expression-parser.js` (see math layer docs). ExpressionList uses `ExpressionParser.isParameter()` and `ExpressionParser.isAssignmentExpression()` for auto-converting parameters to assignments and handling assignment expressions in the UI.
 
 ## Controls & expressions
 - Primary config: `configs/config.json` (loaded first). Fallback: `configs/default-config.js` (used when JSON unavailable).
@@ -45,7 +45,7 @@ This directory holds all frontend code for CodeSignal CosmoPlot. If you add or c
 - Log messages:
   - Create: `Created expression ${id}`
   - Modify (text): `Modified expression ${id}: ${oldExpression} -> ${newExpression}` (or with `(invalid: ${error})` suffix if validation fails)
-  - Modify (slider): `Modified expression ${id} (variable: ${varName}): ${oldExpr} -> ${newExpr}`
+  - Modify (slider): `Modified expression ${id} (parameter: ${paramName}): ${oldExpr} -> ${newExpr}`
   - Delete: `Deleted expression: ${expressionText}`
 - This ensures logs capture user intent (one log per logical action) rather than intermediate state changes.
 
