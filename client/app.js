@@ -9,6 +9,7 @@ import Modal from './design-system/components/modal/modal.js';
 import GraphEngine from './graph-engine.js';
 import SidebarManager from './components/sidebar-manager.js';
 import ExpressionList from './components/expression-list.js';
+import Logger from './utils/logger.js';
 
 
 class App {
@@ -24,6 +25,9 @@ class App {
    * Initialize application
    */
   async init() {
+    // Initialize logger first (checks URL parameters for debug mode)
+    Logger.init();
+
     if (this.debug) {
       console.log('[App] Initializing...');
     }
@@ -78,6 +82,13 @@ class App {
     // GraphEngine (Canvas)
     this.graphEngine = new GraphEngine('graph-canvas');
     this.graphEngine.init();
+
+    // Log initial state of the application (after GraphEngine creates assignment expressions)
+    const functions = StateManager.get('functions') || [];
+    const functionsStr = functions.length > 0
+      ? functions.map(f => `${f.id}: ${f.expression}`).join(', ')
+      : '';
+    Logger.logActivity(`Initial state: ${functionsStr}`);
 
     // Initialize Sidebar Manager
     this.sidebarManager = new SidebarManager('sidebar', 'sidebar-resizer', 'btn-toggle-sidebar', 'btn-floating-toggle-sidebar');

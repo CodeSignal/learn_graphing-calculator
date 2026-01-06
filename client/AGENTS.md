@@ -37,6 +37,18 @@ This directory holds all frontend code for CodeSignal CosmoPlot. If you add or c
 - ExpressionList renders sliders for assignment expressions, creating the UI controls for parameters.
 - When you add a new UI control, either predefine it in config or ensure GraphEngine's variable detection handles it without render loops.
 
+## ExpressionList activity logging
+- ExpressionList logs user actions via `Logger.logActivity()` for create, modify, and delete operations.
+- **Commit-boundary logging**: Logs are emitted only on commit boundaries to avoid spam:
+  - **Text edits**: State updates happen live on each keystroke (for responsive graph updates), but logging occurs only on commit (`blur` event or Enter key). The component tracks `editStartExpression` when entering edit mode and compares old vs new on commit.
+  - **Slider edits**: For parameter sliders (assignment expressions like `a = 1.0`), logging occurs once per interaction end (mouseup/touchend) or for discrete changes (track click/keyboard). During drag, intermediate values update state but do not trigger logs.
+- Log messages:
+  - Create: `Created expression ${id}`
+  - Modify (text): `Modified expression ${id}: ${oldExpression} -> ${newExpression}` (or with `(invalid: ${error})` suffix if validation fails)
+  - Modify (slider): `Modified expression ${id} (variable: ${varName}): ${oldExpr} -> ${newExpr}`
+  - Delete: `Deleted expression: ${expressionText}`
+- This ensures logs capture user intent (one log per logical action) rather than intermediate state changes.
+
 ## Build/run (delegated to root commands)
 - Dev: `npm run start:dev` (Vite on 3000, API on 3001 via proxy).
 - Prod: `npm run build` then `npm run start:prod`.

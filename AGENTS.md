@@ -17,7 +17,13 @@ This repository contains CodeSignal CosmoPlot, a graphing calculator app with li
 6. **Config**:
    - Primary: `configs/config.json` (loaded first). Fallback: `configs/default-config.js` (used when JSON unavailable).
    - Example configurations: `configs/samples/` contains example JSON files for reference; keep schema consistent with `config.json`.
-7. **Server/build**:
+7. **Logging**:
+   - Client logger: `utils/logger.js` provides `Logger.logActivity()` and `Logger.debug()` methods.
+   - Activity logs: Always enabled, semantic logs about user actions (e.g., "Created expression y = a * x").
+   - Debug logs: Toggleable via `?debug=true` URL parameter, development debugging logs.
+   - Server endpoint: `POST /api/logs` accepts `{ type: 'activity' | 'debug', message: string }` and writes to plain text files in `/logs/` directory (`activity.log` and `debug.log`).
+   - Logs directory: Created automatically on server startup if missing. Log files are plain text, one message per line.
+8. **Server/build**:
    - Dev: Vite (`npm run start:dev`) serves client on :3000, proxies API/ws to :3001.
    - Prod: `server.js` (Express-free static server + optional WebSocket broadcast). `npm run build`
      outputs to `dist/`; `npm run start:prod` serves `dist/` on :3000 with `IS_PRODUCTION=true`.
@@ -48,6 +54,7 @@ This repository contains CodeSignal CosmoPlot, a graphing calculator app with li
 - Prod serve: `npm run start:prod` (sets `IS_PRODUCTION=true`, serves `dist/` on 3000)
 - Quick start (prod): `npm start`
 - WebSocket broadcast (optional, requires `ws`): `curl -X POST http://localhost:3000/message -H "Content-Type: application/json" -d '{"message":"Hi"}'`
+- Enable debug logging: Add `?debug=true` to URL (e.g., `http://localhost:3000?debug=true`)
 
 ## Testing & QA
 - **Automated tests**: Unit tests for math layer (e.g., `expression-parser.test.js`) run with `npm run test` or `npm run test:run`. Use Vitest; test files use `*.test.js` pattern in `client/` directory.

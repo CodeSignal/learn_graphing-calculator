@@ -29,6 +29,9 @@ const PORT = isProduction ? 3000 : (process.env.PORT || 3000);
 const CONFIG_PATH_ENV = process.env.CONFIG_PATH || './config.json';
 const CONFIG_PATH = path.resolve(__dirname, CONFIG_PATH_ENV);
 
+// Logs directory path
+const LOGS_DIR = path.join(__dirname, 'logs');
+
 // Track connected WebSocket clients
 const wsClients = new Set();
 
@@ -71,6 +74,34 @@ function serveFile(filePath, res) {
   });
 }
 
+// Ensure logs directory exists
+function ensureLogsDirectory() {
+  if (!fs.existsSync(LOGS_DIR)) {
+    try {
+      fs.mkdirSync(LOGS_DIR, { recursive: true });
+      console.log(`Created logs directory: ${LOGS_DIR}`);
+    } catch (error) {
+      console.error(`Failed to create logs directory: ${error.message}`);
+    }
+  }
+}
+
+// Write log to file
+function writeLog(type, message, callback) {
+  const logFile = type === 'activity' ? 'activity.log' : 'debug.log';
+  const logPath = path.join(LOGS_DIR, logFile);
+  const logLine = `${message}\n`;
+
+  fs.appendFile(logPath, logLine, 'utf8', (error) => {
+    if (error) {
+      console.error(`Failed to write log to ${logPath}:`, error.message);
+    }
+    if (callback) {
+      callback(error);
+    }
+  });
+}
+
 // Serve config file from external path
 function serveConfigFile(req, res) {
   // Resolve the config path (from env var or default)
@@ -99,7 +130,49 @@ function serveConfigFile(req, res) {
 
 // Handle POST requests
 function handlePostRequest(req, res, parsedUrl) {
-  if (parsedUrl.pathname === '/message') {
+  if (parsedUrl.pathname === '/api/logs') {
+    let body = '';
+
+    req.on('data', chunk => {
+      body += chunk.toString();
+    });
+
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        const { type, message } = data;
+
+        // Validate request
+        if (typeof type !== 'string' || typeof message !== 'string') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Type and message must be strings' }));
+          return;
+        }
+
+        if (type !== 'activity' && type !== 'debug') {
+          res.writeHead(400, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid log type. Must be "activity" or "debug"' }));
+          return;
+        }
+
+        // Write log to file
+        writeLog(type, message, (error) => {
+          if (error) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to write log' }));
+            return;
+          }
+
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ success: true }));
+        });
+
+      } catch (error) {
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid JSON' }));
+      }
+    });
+  } else if (parsedUrl.pathname === '/message') {
     let body = '';
 
     req.on('data', chunk => {
@@ -218,6 +291,9 @@ if (isWebSocketAvailable) {
 
 // Start server
 server.listen(PORT, () => {
+  // Ensure logs directory exists on startup
+  ensureLogsDirectory();
+
   console.log(`Server running at http://localhost:${PORT}`);
   if (isProduction) {
     console.log(`Serving static files from: ${DIST_DIR}`);
@@ -238,6 +314,7 @@ server.listen(PORT, () => {
   } else {
     console.log(`WebSocket functionality disabled - install 'ws' package to enable`);
   }
+  console.log(`Logging endpoint available at /api/logs`);
   console.log('Press Ctrl+C to stop the server');
 });
 

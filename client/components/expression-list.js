@@ -8,6 +8,7 @@ import EventBus from '../core/event-bus.js';
 import NumericSlider from '../design-system/components/numeric-slider/numeric-slider.js';
 import ExpressionParser from '../math/expression-parser.js';
 import { toLatex, renderLatex } from '../utils/math-formatter.js';
+import Logger from '../utils/logger.js';
 
 export default class ExpressionList {
     constructor(containerId, addButtonId) {
@@ -155,6 +156,11 @@ export default class ExpressionList {
         item.inputEl.focus();
         // Select all text for easy replacement
         item.inputEl.select();
+
+        // Capture starting expression for commit-boundary logging
+        if (item.editStartExpression === undefined) {
+            item.editStartExpression = item.lastExpression || item.inputEl.value || '';
+        }
     }
 
     /**
@@ -254,7 +260,15 @@ export default class ExpressionList {
         });
 
         input.addEventListener('blur', () => {
+            this.handleExpressionCommit(func.id);
             this.switchToLatexDisplay(func.id);
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                input.blur(); // Trigger blur handler which will log and switch to LaTeX
+            }
         });
 
         latexEl.addEventListener('click', () => {
@@ -281,8 +295,14 @@ export default class ExpressionList {
             lastColor: func.color,
             varName: null,
             isEditing: !func.expression || func.expression.trim() === '',
-            lastExpression: func.expression
+            lastExpression: func.expression,
+            editStartExpression: undefined // Track expression at edit start for commit-boundary logging
         };
+
+        // Capture starting expression for new empty expressions that start in edit mode
+        if (itemData.isEditing) {
+            itemData.editStartExpression = func.expression || '';
+        }
 
         this.renderedItems.set(func.id, itemData);
 
@@ -367,6 +387,10 @@ export default class ExpressionList {
      * @param {number} value - Initial value
      */
     createSliderForAssignment(func, item, varName, value) {
+        // Initialize slider interaction tracking
+        item.sliderInteractionActive = false;
+        item.sliderEditStartExpr = null;
+
         const slider = new NumericSlider(item.sliderContainer, {
             type: 'single',
             min: -10,
@@ -386,6 +410,27 @@ export default class ExpressionList {
                 // Update Expression Text to match
                 const newExpr = `${varName} = ${formattedValue}`;
 
+                // Track slider interaction for commit-boundary logging
+                const isDragging = slider.isDragging;
+
+                // Capture old expression BEFORE state update (for discrete changes)
+                let oldExprForDiscrete = null;
+                if (!isDragging && !item.sliderInteractionActive) {
+                    // Discrete change - capture old expression before update
+                    const functions = StateManager.get('functions') || [];
+                    const currentFunc = functions.find(f => f.id === func.id);
+                    oldExprForDiscrete = currentFunc ? currentFunc.expression : func.expression;
+                }
+
+                // Capture start expression when drag begins
+                if (isDragging && !item.sliderInteractionActive) {
+                    item.sliderInteractionActive = true;
+                    // Get current expression from state before update
+                    const functions = StateManager.get('functions') || [];
+                    const currentFunc = functions.find(f => f.id === func.id);
+                    item.sliderEditStartExpr = currentFunc ? currentFunc.expression : func.expression;
+                }
+
                 // Update local input value immediately for responsiveness
                 if (item.inputEl) item.inputEl.value = newExpr;
 
@@ -394,6 +439,21 @@ export default class ExpressionList {
 
                 // Publish event for graph
                 EventBus.publish('controls:updated', { [varName]: formattedValue });
+
+                // Log user action on interaction end (drag end) or discrete change (non-drag)
+                if (!isDragging) {
+                    if (item.sliderInteractionActive) {
+                        // Drag ended - log once with start -> end
+                        const oldExpr = item.sliderEditStartExpr || func.expression;
+                        this.logModified(func.id, oldExpr, newExpr, { varName });
+                        item.sliderInteractionActive = false;
+                        item.sliderEditStartExpr = null;
+                    } else if (oldExprForDiscrete !== null && oldExprForDiscrete !== newExpr) {
+                        // Discrete change (track click, keyboard) - log immediately
+                        this.logModified(func.id, oldExprForDiscrete, newExpr, { varName });
+                    }
+                }
+                // While dragging (isDragging === true), do not log - wait for drag end
             }
         });
 
@@ -548,6 +608,29 @@ export default class ExpressionList {
         });
     }
 
+    /**
+     * Handle expression commit (blur/Enter) - log  activity if expression changed
+     * @param {string} id - Expression ID
+     */
+    handleExpressionCommit(id) {
+        const item = this.renderedItems.get(id);
+        if (!item || item.editStartExpression === undefined) return;
+
+        const oldExpression = item.editStartExpression || '';
+        const functions = StateManager.get('functions') || [];
+        const currentFunc = functions.find(func => func.id === id);
+        const newExpression = currentFunc ? currentFunc.expression : item.inputEl.value || '';
+        const error = currentFunc ? currentFunc.error : null;
+
+        // Only log if expression actually changed
+        if (oldExpression.trim() !== newExpression.trim()) {
+            this.logModified(id, oldExpression, newExpression, { error });
+        }
+
+        // Clear edit start expression after logging
+        item.editStartExpression = undefined;
+    }
+
     addExpression() {
         const currentFunctions = StateManager.get('functions') || [];
         const newId = `expr_${Date.now()}`;
@@ -561,6 +644,9 @@ export default class ExpressionList {
             color: nextColor,
             visible: true
         };
+
+        // Log activity before state update
+        this.logCreated(newId);
 
         StateManager.set('functions', [...currentFunctions, newFunc]);
     }
@@ -605,8 +691,15 @@ export default class ExpressionList {
     }
 
     deleteExpression(id) {
-        const functions = StateManager.get('functions').filter(f => f.id !== id);
-        StateManager.set('functions', functions);
+        const functions = StateManager.get('functions') || [];
+        const deleted = functions.find(f => f.id === id);
+
+        // Log activity before state update
+        const expressionText = deleted ? deleted.expression : null;
+        this.logDeleted(id, expressionText);
+
+        const filteredFunctions = functions.filter(f => f.id !== id);
+        StateManager.set('functions', filteredFunctions);
     }
 
     /**
@@ -615,6 +708,27 @@ export default class ExpressionList {
      */
     setDebug(enabled) {
         this.debug = enabled;
+    }
+
+    logCreated(id) {
+        Logger.logActivity(`Created expression ${id}`);
+    }
+
+    logModified(id, oldExpr, newExpr, options = {}) {
+        const varName = options.varName;
+        const error = options.error;
+        let messageBase = `Modified expression ${id}: ${oldExpr} -> ${newExpr}`;
+        if (varName) {
+            messageBase = `Modified expression ${id} (variable: ${varName}): ` +
+                `${oldExpr} -> ${newExpr}`;
+        }
+        const message = error ? `${messageBase} (invalid: ${error})` : messageBase;
+        Logger.logActivity(message);
+    }
+
+    logDeleted(id, expression) {
+        const expressionText = expression || id;
+        Logger.logActivity(`Deleted expression: ${expressionText}`);
     }
 
     /**
