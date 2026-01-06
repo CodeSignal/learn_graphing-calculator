@@ -349,6 +349,31 @@ export default class GraphEngine {
     }
 
     /**
+     * Generate a semantic ID for assignment expressions based on parameter name
+     * @param {string} paramName - Parameter name (e.g., 'a', 'b', 'm')
+     * @param {Array} existingFunctions - Current functions array
+     * @returns {string} Available assignment ID (e.g., param_a, param_a_2)
+     * @private
+     */
+    _generateAssignmentId(paramName, existingFunctions) {
+        const baseId = `param_${paramName}`;
+        const ids = new Set(existingFunctions.map(f => f.id));
+
+        if (!ids.has(baseId)) {
+            return baseId;
+        }
+
+        // Try numbered variants
+        let counter = 2;
+        let candidateId = `${baseId}_${counter}`;
+        while (ids.has(candidateId)) {
+            counter++;
+            candidateId = `${baseId}_${counter}`;
+        }
+        return candidateId;
+    }
+
+    /**
      * Create assignment expressions for parameters that don't already have assignments
      * @param {string[]} paramNames - Array of parameter names to create assignments for
      * @param {Array} existingFunctions - Current functions array
@@ -369,7 +394,9 @@ export default class GraphEngine {
 
             // Only create if no assignment exists
             if (!hasAssignment) {
-                const newId = `expr_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`;
+                // Check against both existing functions and functions being added in this batch
+                const allFunctions = [...existingFunctions, ...functionsToAdd];
+                const newId = this._generateAssignmentId(paramName, allFunctions);
                 const currentFunctionCount = existingFunctions.length + functionsToAdd.length;
                 const nextColor = colors[currentFunctionCount % colors.length];
 

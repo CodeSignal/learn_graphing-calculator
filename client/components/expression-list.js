@@ -631,9 +631,25 @@ export default class ExpressionList {
         item.editStartExpression = undefined;
     }
 
+    /**
+     * Generate a simple sequential ID for regular expressions
+     * @param {Array} existingFunctions - Current functions array
+     * @returns {string} Next available expression ID (e.g., expr_1, expr_2)
+     * @private
+     */
+    _generateExpressionId(existingFunctions) {
+        const ids = existingFunctions.map(f => f.id);
+        const exprNumbers = ids
+            .filter(id => /^expr_\d+$/.test(id))
+            .map(id => parseInt(id.replace('expr_', '')))
+            .filter(n => !isNaN(n));
+        const nextNum = exprNumbers.length > 0 ? Math.max(...exprNumbers) + 1 : 1;
+        return `expr_${nextNum}`;
+    }
+
     addExpression() {
         const currentFunctions = StateManager.get('functions') || [];
-        const newId = `expr_${Date.now()}`;
+        const newId = this._generateExpressionId(currentFunctions);
         // Simple color cycle
         const colors = ['#4A90E2', '#50E3C2', '#F5A623', '#D0021B', '#BD10E0', '#B8E986'];
         const nextColor = colors[currentFunctions.length % colors.length];
