@@ -230,14 +230,14 @@ describe('ExpressionParser', () => {
     })
   })
 
-  describe('getAllVariables vs detectVariables', () => {
-    it('should return all variables including parameters', () => {
-      const vars1 = parser.getAllVariables('a*x + b')
+  describe('getAllSymbols vs detectVariables', () => {
+    it('should return all symbols including variables and parameters', () => {
+      const vars1 = parser.getAllSymbols('a*x + b')
       expect(vars1).toContain('a')
       expect(vars1).toContain('x')
       expect(vars1).toContain('b')
 
-      const vars2 = parser.getAllVariables('a*x + b*y + c')
+      const vars2 = parser.getAllSymbols('a*x + b*y + c')
       expect(vars2).toContain('a')
       expect(vars2).toContain('x')
       expect(vars2).toContain('b')
@@ -250,25 +250,25 @@ describe('ExpressionParser', () => {
       expect(parser.detectVariables('a*x + b*y + c')).toEqual(['x', 'y'])
     })
 
-    it('should exclude constants from variable extraction', () => {
-      const vars = parser.getAllVariables('x + e + pi')
+    it('should exclude constants from symbol extraction', () => {
+      const vars = parser.getAllSymbols('x + e + pi')
       expect(vars).toContain('x')
       expect(vars).not.toContain('e')
       expect(vars).not.toContain('pi')
     })
 
-    it('should exclude function names from variable extraction', () => {
-      const vars = parser.getAllVariables('sin(x) + cos(y)')
+    it('should exclude function names from symbol extraction', () => {
+      const vars = parser.getAllSymbols('sin(x) + cos(y)')
       expect(vars).toContain('x')
       expect(vars).toContain('y')
       expect(vars).not.toContain('sin')
       expect(vars).not.toContain('cos')
     })
 
-    it('should return empty array for invalid expressions in getAllVariables', () => {
-      expect(parser.getAllVariables('invalid+++')).toEqual([])
-      expect(parser.getAllVariables(null)).toEqual([])
-      expect(parser.getAllVariables('')).toEqual([])
+    it('should return empty array for invalid expressions in getAllSymbols', () => {
+      expect(parser.getAllSymbols('invalid+++')).toEqual([])
+      expect(parser.getAllSymbols(null)).toEqual([])
+      expect(parser.getAllSymbols('')).toEqual([])
     })
   })
 

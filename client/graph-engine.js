@@ -313,8 +313,8 @@ export default class GraphEngine {
         functions.forEach(func => {
             if (!func.expression) return;
             try {
-                // Use public API to get all variables
-                const vars = this.evaluator.parser.getAllVariables(func.expression);
+                // Use public API to get all symbols
+                const vars = this.evaluator.parser.getAllSymbols(func.expression);
                 vars.forEach(v => {
                     // Filter out x and y (these are not parameters)
                     if (v !== 'x' && v !== 'y') {

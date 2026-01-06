@@ -183,12 +183,12 @@ export default class ExpressionParser {
   }
 
   /**
-   * Get all variables from an expression (including parameters like a, b, etc.)
-   * Excludes constants and function names, but includes all variable symbols.
+   * Get all symbols from an expression (including variables x/y and parameters like a, b, etc.)
+   * Excludes constants and function names, but includes all variable/parameter symbols.
    * @param {string} expression - Mathematical expression to analyze
-   * @returns {string[]} Array of all variable names found in expression
+   * @returns {string[]} Array of all symbol names found in expression
    */
-  getAllVariables(expression) {
+  getAllSymbols(expression) {
     if (!expression || typeof expression !== 'string') {
       return [];
     }
