@@ -8,7 +8,9 @@
   <!-- Fonts (Work Sans) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link
+    href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap"
+    rel="stylesheet">
 
   <!-- Design System Foundations -->
   <link rel="stylesheet" href="./design-system/colors/colors.css">
@@ -26,7 +28,10 @@
   <link rel="stylesheet" href="./design-system/components/icons/icons.css">
 
   <!-- KaTeX for LaTeX rendering -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css" crossorigin="anonymous">
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css"
+    crossorigin="anonymous">
 
   <!-- Application-specific styles -->
   <link rel="stylesheet" href="./app.css">
@@ -46,11 +51,19 @@
     <aside id="sidebar" class="sidebar" style="width: 300px;">
       <!-- Sidebar Header -->
       <header class="sidebar-header">
-        <button id="btn-toggle-sidebar" class="button button-secondary sidebar-toggle-btn" aria-label="Toggle sidebar">&lt;&lt;</button>
+        <button
+          id="btn-toggle-sidebar"
+          class="button button-secondary sidebar-toggle-btn"
+          aria-label="Toggle sidebar">
+          &lt;&lt;
+        </button>
       </header>
 
       <!-- Expression List -->
-      <section class="sidebar-section" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column;">
+      <section
+        class="sidebar-section"
+        style="flex: 1; overflow-y: auto; display: flex;
+          flex-direction: column;">
         <div id="expression-list" style="flex: 1; overflow-y: auto;">
           <!-- Expressions will be injected here -->
           <button class="button button-tertiary" id="btn-add-expression"
@@ -64,12 +77,19 @@
     <div id="sidebar-resizer" class="sidebar-resizer"></div>
 
     <!-- Floating Toggle Button (shown when sidebar is collapsed) -->
-    <button id="btn-floating-toggle-sidebar" class="button button-secondary sidebar-floating-toggle" aria-label="Show sidebar">&gt;&gt;</button>
+    <button
+      id="btn-floating-toggle-sidebar"
+      class="button button-secondary sidebar-floating-toggle"
+      aria-label="Show sidebar">
+      &gt;&gt;
+    </button>
 
     <div class="content-area" style="padding: 0; position: relative;">
       <!-- Toolbar for Canvas -->
-      <div id="graph-toolbar"
-        style="position: absolute; top: 1rem; right: 1rem; z-index: 10; display: flex; gap: 0.5rem;">
+      <div
+        id="graph-toolbar"
+        style="position: absolute; top: 1rem; right: 1rem;
+          z-index: 10; display: flex; gap: 0.5rem;">
         <button class="button button-secondary" id="btn-home" aria-label="Reset View">⟲</button>
         <button class="button button-secondary" id="btn-zoom-in" aria-label="Zoom In">+</button>
         <button class="button button-secondary" id="btn-zoom-out" aria-label="Zoom Out">-</button>
@@ -78,8 +98,16 @@
       <canvas id="graph-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
 
       <!-- Trace / Cursor Info -->
-      <div id="cursor-info"
-        style="position: absolute; bottom: 1rem; left: 1rem; background: var(--Colors-Box-Background); padding: var(--UI-Spacing-spacing-s); border-radius: var(--UI-Radius-radius-m); box-shadow: var(--Colors-Shadow-Soft); pointer-events: none; opacity: 0.8; font-family: monospace;">
+      <div
+        id="cursor-info"
+        style="position: absolute; bottom: 1rem; left: 1rem;
+          background: var(--Colors-Box-Background);
+          padding: var(--UI-Spacing-spacing-s);
+          border-radius: var(--UI-Radius-radius-m);
+          box-shadow: var(--Colors-Shadow-Soft);
+          pointer-events: none;
+          opacity: 0.8;
+          font-family: monospace;">
         x: 0.00, y: 0.00
       </div>
     </div>
@@ -101,7 +129,11 @@
     <!-- Overview Section -->
     <section id="overview">
       <h2>Overview</h2>
-      <p>CodeSignal CosmoPlot is a graphing calculator that allows you to visualize mathematical expressions. Enter mathematical expressions using <b>x</b> as the variable, and the graph will be rendered in real-time on the canvas.</p>
+      <p>
+        CodeSignal CosmoPlot is a graphing calculator that allows you to visualize
+        mathematical expressions. Enter expressions using <b>x</b> as the variable,
+        and the graph will be rendered in real-time on the canvas.
+      </p>
     </section>
 
     <!-- Getting Started Section -->
@@ -128,9 +160,33 @@
       <h2>Key Features</h2>
 
       <h3>Parameters</h3>
-      <p>You can use variables like <code>a</code>, <code>b</code>, etc., to create interactive sliders. The graph will update automatically as you adjust the slider values.</p>
+      <p>
+        You can use variables like <code>a</code>, <code>b</code>, etc., to create
+        interactive sliders. The graph will update automatically as you adjust the
+        slider values.
+      </p>
       <ul>
-        <li><code>a * sin(b * x)</code> - Creates sliders for <code>a</code> (amplitude) and <code>b</code> (frequency)</li>
+        <li>
+          <code>a * sin(b * x)</code> - Creates sliders for <code>a</code>
+          (amplitude) and <code>b</code> (frequency)
+        </li>
+      </ul>
+
+      <h3>Line Types</h3>
+      <p>Each line is classified as a graph or a definition.</p>
+      <ul>
+        <li>
+          <strong>Graph</strong>: An expression that can be evaluated as
+          <code>y = f(x)</code>, including <code>y = 5</code>
+        </li>
+        <li>
+          <strong>Definition</strong>: A parameter assignment like <code>a = 1</code>
+          or <code>b = pi</code>
+        </li>
+        <li>
+          <strong>Invalid</strong>: Missing <code>x</code> in a graph line or
+          assignments that depend on variables (e.g., <code>a = x + 1</code>)
+        </li>
       </ul>
     </section>
 

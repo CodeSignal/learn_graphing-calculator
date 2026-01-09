@@ -6,7 +6,12 @@
 import StateManager from './core/state-manager.js';
 import EventBus from './core/event-bus.js';
 import FunctionEvaluator from './math/function-evaluator.js';
-import ExpressionParser from './math/expression-parser.js';
+import sharedParser from './math/shared-parser.js';
+import { classifyLine, VERTICAL_LINE_MARKER } from './math/line-classifier.js';
+import { analyzeParameters } from './math/parameter-utils.js';
+import { DEFAULT_PARAMETER } from './math/parameter-defaults.js';
+import { COLORS } from './utils/color-constants.js';
+import { DEFAULT_VIEWPORT_BOUNDS } from './core/config-loader.js';
 
 export default class GraphEngine {
     constructor(canvasId) {
@@ -14,12 +19,7 @@ export default class GraphEngine {
         this.ctx = this.canvas.getContext('2d');
 
         // Initialize viewport with defaults (will be synced from state.graph in init)
-        this.viewport = {
-            xMin: -10,
-            xMax: 10,
-            yMin: -10,
-            yMax: 10
-        };
+        this.viewport = { ...DEFAULT_VIEWPORT_BOUNDS };
         this.width = 0;
         this.height = 0;
 
@@ -31,7 +31,7 @@ export default class GraphEngine {
         this.parameterDetectionTimeout = null;
         this.saveTimeout = null;
 
-        this.evaluator = new FunctionEvaluator();
+        this.evaluator = new FunctionEvaluator(null, sharedParser);
 
         // Cleanup tracking
         this.unsubscribers = [];
@@ -68,9 +68,9 @@ export default class GraphEngine {
             })
         );
 
-        // Listen for control updates (sliders)
+        // Listen for parameter updates (sliders)
         this.unsubscribers.push(
-            EventBus.subscribe('controls:updated', () => {
+            EventBus.subscribe('parameters:updated', () => {
                 this.requestRender();
             })
         );
@@ -79,6 +79,7 @@ export default class GraphEngine {
         this.unsubscribers.push(
             EventBus.subscribe('state:changed:functions', () => {
                 this.requestRender();
+                this.scheduleParameterDetection();
             })
         );
 
@@ -154,20 +155,25 @@ export default class GraphEngine {
 
     // Coordinate Transformations
     xToPixel(x) {
-        return ((x - this.viewport.xMin) / (this.viewport.xMax - this.viewport.xMin)) * this.width;
+        return ((x - this.viewport.xMin) /
+            (this.viewport.xMax - this.viewport.xMin)) * this.width;
     }
 
     yToPixel(y) {
         // Invert Y because canvas Y grows downwards
-        return this.height - ((y - this.viewport.yMin) / (this.viewport.yMax - this.viewport.yMin)) * this.height;
+        return this.height - ((y - this.viewport.yMin) /
+            (this.viewport.yMax - this.viewport.yMin)) * this.height;
     }
 
     pixelToX(px) {
-        return this.viewport.xMin + (px / this.width) * (this.viewport.xMax - this.viewport.xMin);
+        return this.viewport.xMin +
+            (px / this.width) * (this.viewport.xMax - this.viewport.xMin);
     }
 
     pixelToY(py) {
-        return this.viewport.yMin + ((this.height - py) / this.height) * (this.viewport.yMax - this.viewport.yMin);
+        return this.viewport.yMin +
+            ((this.height - py) / this.height) *
+            (this.viewport.yMax - this.viewport.yMin);
     }
 
     // Navigation
@@ -177,7 +183,8 @@ export default class GraphEngine {
 
         this.viewport.xMin -= dxUnits;
         this.viewport.xMax -= dxUnits;
-        this.viewport.yMin += dyUnits; // Canvas Y grows downward, so dragging down (dy>0) shows higher y values
+        // Canvas Y grows downward, so dragging down (dy>0) shows higher y values
+        this.viewport.yMin += dyUnits;
         this.viewport.yMax += dyUnits;
 
         this.requestRender();
@@ -276,12 +283,22 @@ export default class GraphEngine {
 
         // Draw Functions
         const functions = StateManager.get('functions') || [];
-        const controls = StateManager.get('controls') || {};
+        const scope = StateManager.getControlValues();
 
         functions.forEach(func => {
-            if (func.visible && func.expression) {
-                this.drawFunction(func, controls);
+            if (!func.visible || !func.expression) return;
+            const classification = classifyLine(func.expression, sharedParser);
+            if (classification.kind !== 'graph' || classification.error) return;
+
+            // Handle vertical lines (x = constant)
+            if (classification.plotExpression === VERTICAL_LINE_MARKER && classification.verticalLineX !== null) {
+                this.drawVerticalLine(classification.verticalLineX, func.color, 2);
+                return;
             }
+
+            // Handle regular graph expressions
+            if (!classification.plotExpression) return;
+            this.drawFunction(func, classification.plotExpression, scope);
         });
     }
 
@@ -299,52 +316,59 @@ export default class GraphEngine {
     }
 
     /**
-     * Detect new parameters from expressions and update controls state
+     * Detect new parameters from expressions and update parameters state
      * Called outside render cycle to prevent state mutations during rendering
      * Also auto-creates assignment expressions for newly detected parameters
      */
     detectAndUpdateParameters() {
         const functions = StateManager.get('functions') || [];
-        const controls = { ...StateManager.get('controls') || {} };
-        const allVars = new Set();
-        const newParams = [];
+        const parameters = { ...(StateManager.get('parameters') || {}) };
+        const analysis = analyzeParameters(functions, sharedParser);
 
-        // Extract all variables from all expressions
-        functions.forEach(func => {
-            if (!func.expression) return;
-            try {
-                // Use public API to get all symbols
-                const vars = this.evaluator.parser.getAllSymbols(func.expression);
-                vars.forEach(v => {
-                    // Filter out x and y (these are not parameters)
-                    if (v !== 'x' && v !== 'y') {
-                        allVars.add(v);
-                    }
-                });
-            } catch (e) {
-                // Ignore parsing errors - expression might be incomplete
+        let parametersChanged = false;
+
+        const ensureParameter = (paramName, nextValue = null) => {
+            const existing = parameters[paramName];
+            const value = typeof nextValue === 'number'
+                ? nextValue
+                : existing?.value ?? DEFAULT_PARAMETER.value;
+
+            const next = {
+                ...DEFAULT_PARAMETER,
+                ...(existing || {}),
+                value
+            };
+
+            const hasChange = !existing ||
+                existing.value !== next.value ||
+                existing.min !== next.min ||
+                existing.max !== next.max ||
+                existing.step !== next.step;
+
+            if (hasChange) {
+                parameters[paramName] = next;
+                parametersChanged = true;
             }
+        };
+
+        analysis.definedParams.forEach(paramName => {
+            ensureParameter(paramName, analysis.assignmentValues.get(paramName));
         });
 
-        // Add new parameters to controls if they don't exist
-        let controlsChanged = false;
-        allVars.forEach(v => {
-            if (typeof controls[v] === 'undefined') {
-                controls[v] = 1.0; // Default value
-                newParams.push(v);
-                controlsChanged = true;
-            }
+        analysis.usedParams.forEach(paramName => {
+            ensureParameter(paramName, parameters[paramName]?.value);
         });
 
-        // Update state only if new parameters were found
-        // This triggers 'controls:updated' which will request a render
-        if (controlsChanged) {
-            StateManager.set('controls', controls);
+        if (parametersChanged) {
+            StateManager.set('parameters', parameters);
         }
 
-        // Auto-create assignment expressions for newly detected parameters
-        if (newParams.length > 0) {
-            this.createAssignmentExpressionsForParameters(newParams, functions);
+        if (analysis.missingAssignments.length > 0) {
+            this.createAssignmentExpressionsForParameters(
+                analysis.missingAssignments,
+                functions,
+                parameters
+            );
         }
     }
 
@@ -379,17 +403,15 @@ export default class GraphEngine {
      * @param {Array} existingFunctions - Current functions array
      * @private
      */
-    createAssignmentExpressionsForParameters(paramNames, existingFunctions) {
-        const parser = new ExpressionParser();
-        const colors = ['#4A90E2', '#50E3C2', '#F5A623', '#D0021B', '#BD10E0', '#B8E986'];
+    createAssignmentExpressionsForParameters(paramNames, existingFunctions, parameters) {
         const functionsToAdd = [];
 
         paramNames.forEach(paramName => {
             // Check if assignment expression already exists for this parameter
             const hasAssignment = existingFunctions.some(func => {
                 if (!func.expression) return false;
-                const assignment = parser.isAssignmentExpression(func.expression);
-                return assignment.isAssignment && assignment.paramName === paramName;
+                const assignment = classifyLine(func.expression, sharedParser);
+                return assignment.kind === 'assignment' && assignment.paramName === paramName;
             });
 
             // Only create if no assignment exists
@@ -398,11 +420,12 @@ export default class GraphEngine {
                 const allFunctions = [...existingFunctions, ...functionsToAdd];
                 const newId = this._generateAssignmentId(paramName, allFunctions);
                 const currentFunctionCount = existingFunctions.length + functionsToAdd.length;
-                const nextColor = colors[currentFunctionCount % colors.length];
+                const nextColor = COLORS[currentFunctionCount % COLORS.length];
+                const currentValue = parameters?.[paramName]?.value ?? DEFAULT_PARAMETER.value;
 
                 functionsToAdd.push({
                     id: newId,
-                    expression: `${paramName} = 1.0`,
+                    expression: `${paramName} = ${currentValue}`,
                     color: nextColor,
                     visible: true
                 });
@@ -421,7 +444,9 @@ export default class GraphEngine {
         if (!graph || graph.showGrid !== true) return;
 
         this.ctx.beginPath();
-        this.ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--grid-color').trim() || '#e0e0e0';
+        this.ctx.strokeStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--grid-color')
+            .trim() || '#e0e0e0';
         this.ctx.lineWidth = 1;
 
         // Calculate nice step size
@@ -470,7 +495,9 @@ export default class GraphEngine {
         if (!graph || graph.showAxes !== true) return;
 
         this.ctx.beginPath();
-        this.ctx.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--axis-color').trim() || '#666666';
+        this.ctx.strokeStyle = getComputedStyle(document.documentElement)
+            .getPropertyValue('--axis-color')
+            .trim() || '#666666';
         this.ctx.lineWidth = 2;
 
         // X Axis (y = 0)
@@ -490,17 +517,13 @@ export default class GraphEngine {
         this.ctx.stroke();
     }
 
-    drawFunction(func, controls) {
-        // Skip rendering if expression has an error
-        if (func.error) {
-            return;
-        }
-
-        const scope = { ...controls }; // Base scope
+    drawFunction(func, expression, scopeValues) {
+        const scope = { ...scopeValues }; // Base scope
 
         // Update evaluator's expression
         try {
-            this.evaluator.setExpression(func.expression, ['x', ...Object.keys(controls)]);
+            const variables = ['x', ...Object.keys(scopeValues).sort()];
+            this.evaluator.setExpression(expression, variables);
 
             this.ctx.beginPath();
             this.ctx.strokeStyle = func.color;
@@ -547,6 +570,37 @@ export default class GraphEngine {
             // If evaluation fails during render, silently skip
             // Error should have been caught during validation in ExpressionList
             console.warn(`[GraphEngine] Evaluation error for "${func.expression}":`, e.message);
+        }
+    }
+
+    /**
+     * Draw a vertical line at a specific x-coordinate
+     * @param {number} xValue - The x-coordinate where the line should be drawn
+     * @param {string} color - Line color (e.g., '#000000')
+     * @param {number} lineWidth - Line width in pixels
+     */
+    drawVerticalLine(xValue, color, lineWidth) {
+        // Check if x-value is within viewport bounds
+        if (xValue < this.viewport.xMin || xValue > this.viewport.xMax) {
+            return; // Line is outside viewport
+        }
+
+        try {
+            const px = this.xToPixel(xValue);
+
+            // Clip to canvas bounds
+            if (px < 0 || px > this.width) {
+                return;
+            }
+
+            this.ctx.beginPath();
+            this.ctx.strokeStyle = color;
+            this.ctx.lineWidth = lineWidth;
+            this.ctx.moveTo(px, 0);
+            this.ctx.lineTo(px, this.height);
+            this.ctx.stroke();
+        } catch (e) {
+            console.warn(`[GraphEngine] Error drawing vertical line at x=${xValue}:`, e.message);
         }
     }
 

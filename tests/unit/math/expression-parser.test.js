@@ -327,83 +327,78 @@ describe('ExpressionParser', () => {
     })
   })
 
-  describe('isAssignmentExpression', () => {
-    it('should detect simple assignment expressions', () => {
-      const result1 = parser.isAssignmentExpression('a = 5')
+  describe('parseAssignmentSyntax', () => {
+    it('should detect assignment syntax for any symbol including x and y', () => {
+      const result1 = parser.parseAssignmentSyntax('x = 5')
       expect(result1.isAssignment).toBe(true)
-      expect(result1.paramName).toBe('a')
-      expect(result1.value).toBe(5)
+      expect(result1.lhs).toBe('x')
+      expect(result1.rhs).toBe('5')
 
-      const result2 = parser.isAssignmentExpression('b = -3.14')
+      const result2 = parser.parseAssignmentSyntax('y = 10')
       expect(result2.isAssignment).toBe(true)
-      expect(result2.paramName).toBe('b')
-      expect(result2.value).toBeCloseTo(-3.14, 5)
+      expect(result2.lhs).toBe('y')
+      expect(result2.rhs).toBe('10')
+
+      const result3 = parser.parseAssignmentSyntax('a = 3')
+      expect(result3.isAssignment).toBe(true)
+      expect(result3.lhs).toBe('a')
+      expect(result3.rhs).toBe('3')
     })
 
-    it('should evaluate assignment expressions with calculations', () => {
-      const result1 = parser.isAssignmentExpression('a = 1 + 2')
+    it('should extract RHS expression string without evaluation', () => {
+      const result1 = parser.parseAssignmentSyntax('a = 1 + 2')
       expect(result1.isAssignment).toBe(true)
-      expect(result1.paramName).toBe('a')
-      expect(result1.value).toBe(3)
+      expect(result1.lhs).toBe('a')
+      // math.js toString() may or may not add parentheses - just check it contains the expression
+      expect(result1.rhs).toContain('1')
+      expect(result1.rhs).toContain('2')
 
-      const result2 = parser.isAssignmentExpression('b = 2 * 3')
+      const result2 = parser.parseAssignmentSyntax('b = pi')
       expect(result2.isAssignment).toBe(true)
-      expect(result2.paramName).toBe('b')
-      expect(result2.value).toBe(6)
-    })
+      expect(result2.lhs).toBe('b')
+      expect(result2.rhs).toBe('pi')
 
-    it('should evaluate assignment expressions with constants', () => {
-      const result = parser.isAssignmentExpression('a = pi')
-      expect(result.isAssignment).toBe(true)
-      expect(result.paramName).toBe('a')
-      expect(result.value).toBeCloseTo(Math.PI, 5)
-    })
-
-    it('should reject reserved variables x and y', () => {
-      const result1 = parser.isAssignmentExpression('x = 5')
-      expect(result1.isAssignment).toBe(false)
-      expect(result1.paramName).toBe(null)
-      expect(result1.value).toBe(null)
-
-      const result2 = parser.isAssignmentExpression('y = 10')
-      expect(result2.isAssignment).toBe(false)
-      expect(result2.paramName).toBe(null)
-      expect(result2.value).toBe(null)
+      const result3 = parser.parseAssignmentSyntax('x = sin(1)')
+      expect(result3.isAssignment).toBe(true)
+      expect(result3.lhs).toBe('x')
+      expect(result3.rhs).toBe('sin(1)')
     })
 
     it('should reject non-assignment expressions', () => {
-      expect(parser.isAssignmentExpression('a + 1')).toEqual({ isAssignment: false, paramName: null, value: null })
-      expect(parser.isAssignmentExpression('a')).toEqual({ isAssignment: false, paramName: null, value: null })
-      expect(parser.isAssignmentExpression('sin(x)')).toEqual({ isAssignment: false, paramName: null, value: null })
-    })
-
-    it('should reject assignments with variables in value', () => {
-      const result = parser.isAssignmentExpression('a = x + 1')
-      expect(result.isAssignment).toBe(false)
-      expect(result.paramName).toBe(null)
-      expect(result.value).toBe(null)
-    })
-
-    it('should reject assignments with non-numeric values', () => {
-      const result = parser.isAssignmentExpression('a = b')
-      expect(result.isAssignment).toBe(false)
-      expect(result.paramName).toBe(null)
-      expect(result.value).toBe(null)
+      expect(parser.parseAssignmentSyntax('a + 1')).toEqual({ isAssignment: false, lhs: null, rhs: null })
+      expect(parser.parseAssignmentSyntax('a')).toEqual({ isAssignment: false, lhs: null, rhs: null })
+      expect(parser.parseAssignmentSyntax('sin(x)')).toEqual({ isAssignment: false, lhs: null, rhs: null })
     })
 
     it('should handle invalid input', () => {
-      expect(parser.isAssignmentExpression(null)).toEqual({ isAssignment: false, paramName: null, value: null })
-      expect(parser.isAssignmentExpression('')).toEqual({ isAssignment: false, paramName: null, value: null })
-      expect(parser.isAssignmentExpression('invalid+++')).toEqual({ isAssignment: false, paramName: null, value: null })
+      expect(parser.parseAssignmentSyntax(null)).toEqual({ isAssignment: false, lhs: null, rhs: null })
+      expect(parser.parseAssignmentSyntax('')).toEqual({ isAssignment: false, lhs: null, rhs: null })
+      expect(parser.parseAssignmentSyntax('invalid+++')).toEqual({ isAssignment: false, lhs: null, rhs: null })
     })
 
     it('should trim whitespace', () => {
-      const result = parser.isAssignmentExpression('  a = 5  ')
+      const result = parser.parseAssignmentSyntax('  x = 5  ')
       expect(result.isAssignment).toBe(true)
-      expect(result.paramName).toBe('a')
-      expect(result.value).toBe(5)
+      expect(result.lhs).toBe('x')
+      expect(result.rhs).toBe('5')
+    })
+
+    it('should handle complex RHS expressions', () => {
+      const result1 = parser.parseAssignmentSyntax('a = x + 1')
+      expect(result1.isAssignment).toBe(true)
+      expect(result1.lhs).toBe('a')
+      // math.js toString() may or may not add parentheses - just check it contains the expression
+      expect(result1.rhs).toContain('x')
+      expect(result1.rhs).toContain('1')
+
+      const result2 = parser.parseAssignmentSyntax('y = b * 2')
+      expect(result2.isAssignment).toBe(true)
+      expect(result2.lhs).toBe('y')
+      expect(result2.rhs).toContain('b')
+      expect(result2.rhs).toContain('2')
     })
   })
+
 
   describe('Cache Functionality', () => {
     it('should increment cache hits on repeated parsing', () => {

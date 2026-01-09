@@ -4,7 +4,7 @@
  */
 
 import katex from 'katex';
-import ExpressionParser from '../math/expression-parser.js';
+import sharedParser from '../math/shared-parser.js';
 
 /**
  * Converts a math.js expression to LaTeX syntax
@@ -61,9 +61,8 @@ export function toLatex(expression) {
 export function formatFunctionExpression(id, expression, variables = null) {
   // Auto-detect variables if not provided
   if (variables === null) {
-    const parser = new ExpressionParser();
     try {
-      variables = parser.detectVariables(expression);
+      variables = sharedParser.detectVariables(expression);
     } catch (error) {
       // If detection fails, fall back to ['x'] for display purposes
       // (though this shouldn't happen if expressions are validated)

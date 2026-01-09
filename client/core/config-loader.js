@@ -16,6 +16,18 @@
  */
 
 import EventBus from './event-bus.js';
+import { COLORS } from '../utils/color-constants.js';
+
+/**
+ * Default viewport bounds used throughout the application
+ * @constant {Object}
+ */
+export const DEFAULT_VIEWPORT_BOUNDS = {
+  xMin: -10,
+  xMax: 10,
+  yMin: -10,
+  yMax: 10
+};
 
 class ConfigLoaderClass {
   constructor() {
@@ -140,10 +152,7 @@ class ConfigLoaderClass {
     const defaults = {
       functions: [],
       graph: {
-        xMin: -10,
-        xMax: 10,
-        yMin: -10,
-        yMax: 10,
+        ...DEFAULT_VIEWPORT_BOUNDS,
         showGrid: true,
         showAxes: true,
         showLegend: true
@@ -178,15 +187,7 @@ class ConfigLoaderClass {
    * @private
    */
   _getDefaultColor(index) {
-    const colors = [
-      '#1062fb', // Blue - functions
-      '#ff6b35', // Orange - derivatives
-      '#10b981', // Green - integrals
-      '#8b5cf6', // Purple - gradients
-      '#f59e0b'  // Yellow - extras
-    ];
-
-    return colors[index % colors.length];
+    return COLORS[index % COLORS.length];
   }
 
   /**

@@ -10,12 +10,12 @@
  *   const value = evaluator.evaluateAt(5);
  */
 
-import ExpressionParser from './expression-parser.js';
+import sharedParser from './shared-parser.js';
 
 export default class FunctionEvaluator {
-  constructor(parsedExpression = null) {
+  constructor(parsedExpression = null, parser = sharedParser) {
     this.parsedExpression = parsedExpression;
-    this.parser = new ExpressionParser();
+    this.parser = parser;
   }
 
   /**

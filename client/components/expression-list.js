@@ -6,19 +6,24 @@
 import StateManager from '../core/state-manager.js';
 import EventBus from '../core/event-bus.js';
 import NumericSlider from '../design-system/components/numeric-slider/numeric-slider.js';
-import ExpressionParser from '../math/expression-parser.js';
+import sharedParser from '../math/shared-parser.js';
+import { classifyLine } from '../math/line-classifier.js';
+import { DEFAULT_PARAMETER } from '../math/parameter-defaults.js';
 import { toLatex, renderLatex } from '../utils/math-formatter.js';
 import Logger from '../utils/logger.js';
+import { COLORS } from '../utils/color-constants.js';
 
 export default class ExpressionList {
     constructor(containerId, addButtonId) {
         this.container = document.getElementById(containerId);
         this.addButton = document.getElementById(addButtonId);
         this.boundRender = this.render.bind(this);
-        this.renderedItems = new Map(); // id -> { element, slider, inputEl, latexEl, colorEl, errorEl, sliderContainer, lastColor, paramName, isEditing }
+        this.boundHandleFunctions = this.handleFunctionsUpdate.bind(this);
+        // id -> { element, slider, inputEl, latexEl, colorEl, errorEl, sliderContainer, ... }
+        this.renderedItems = new Map();
         this.unsubscribers = [];
         this.debug = false;
-        this.parser = new ExpressionParser();
+        this.parser = sharedParser;
     }
 
     init() {
@@ -29,20 +34,20 @@ export default class ExpressionList {
 
         // Subscribe to functions changes
         this.unsubscribers.push(
-            StateManager.subscribe('functions', this.boundRender)
+            StateManager.subscribe('functions', this.boundHandleFunctions)
         );
 
         // Initial render
-        this.render(StateManager.get('functions'));
+        this.handleFunctionsUpdate(StateManager.get('functions'));
 
         // Bind Add Button
         this.addButton.addEventListener('click', () => {
             this.addExpression();
         });
 
-        // Subscribe to controls changes to update slider values if changed externally (e.g. by another expression)
+        // Subscribe to parameter changes to update slider values if changed externally
         this.unsubscribers.push(
-            StateManager.subscribe('controls', () => {
+            StateManager.subscribe('parameters', () => {
                 this.updateSlidersFromState();
             })
         );
@@ -54,7 +59,11 @@ export default class ExpressionList {
      */
     render(functions) {
         if (this.debug) {
-            console.log('[ExpressionList] Rendering', functions, functions ? functions.length : 0);
+            console.log(
+                '[ExpressionList] Rendering',
+                functions,
+                functions ? functions.length : 0
+            );
         }
         if (!functions) return;
 
@@ -70,7 +79,9 @@ export default class ExpressionList {
         // 2. Handle empty state
         if (functions.length === 0) {
             if (this.renderedItems.size === 0) {
-                this.container.innerHTML = '<div style="padding: 1rem; color: var(--color-text-weak);">No expressions added</div>';
+                this.container.innerHTML =
+                    '<div style="padding: 1rem; color: var(--color-text-weak);">' +
+                    'No expressions added</div>';
                 // Ensure button is still visible after clearing innerHTML
                 this.ensureButtonPosition();
             }
@@ -97,6 +108,49 @@ export default class ExpressionList {
 
         // 5. Ensure add button is always at the end
         this.ensureButtonPosition();
+    }
+
+    handleFunctionsUpdate(functions) {
+        if (!functions) return;
+
+        const updated = functions.map(func => {
+            const expression = func.expression || '';
+            const classification = classifyLine(expression, this.parser);
+
+            return {
+                ...func,
+                error: classification.error,
+                kind: classification.kind,
+                paramName: classification.paramName ?? null,
+                value: classification.value ?? null,
+                usedVariables: classification.usedVariables ?? [],
+                plotExpression: classification.plotExpression ?? null
+            };
+        });
+
+        const needsUpdate = updated.some((nextFunc, idx) => {
+            const prev = functions[idx];
+            if (!prev) return true;
+
+            const prevVars = prev.usedVariables || [];
+            const nextVars = nextFunc.usedVariables || [];
+            const varsMatch = prevVars.length === nextVars.length &&
+                prevVars.every((val, i) => val === nextVars[i]);
+
+            return prev.error !== nextFunc.error ||
+                prev.kind !== nextFunc.kind ||
+                prev.paramName !== nextFunc.paramName ||
+                prev.value !== nextFunc.value ||
+                prev.plotExpression !== nextFunc.plotExpression ||
+                !varsMatch;
+        });
+
+        if (needsUpdate) {
+            StateManager.set('functions', updated);
+            return;
+        }
+
+        this.render(functions);
     }
 
     /**
@@ -230,25 +284,81 @@ export default class ExpressionList {
         if (func.error) item.classList.add('has-error');
 
         item.innerHTML = `
-        <div class="expression-color" style="background-color: ${func.color};" title="Toggle Visibility"></div>
+        <div class="expression-color"
+            style="background-color: ${func.color};"
+            title="Toggle Visibility"></div>
         <div class="expression-main" style="flex: 1;">
             <div class="expression-input-container">
                 <div class="expression-latex" data-id="${func.id}"></div>
-                <input type="text" class="expression-input input" value="${this.escapeHtml(func.expression)}" placeholder="Enter expression..." data-id="${func.id}" style="display: none;">
+                <input type="text"
+                    class="expression-input input"
+                    value="${this.escapeHtml(func.expression)}"
+                    placeholder="Enter expression..."
+                    data-id="${func.id}"
+                    style="display: none;">
                 <div class="expression-error">${this.escapeHtml(func.error || '')}</div>
             </div>
-            <div class="expression-slider-container" id="slider-container-${func.id}"></div>
+            <div class="expression-slider-container"
+                id="slider-container-${func.id}">
+                <div class="expression-slider-row">
+                    <div class="expression-slider" data-id="${func.id}"></div>
+                    <button class="button button-text button-small expression-slider-toggle"
+                        type="button"
+                        data-id="${func.id}"
+                        title="Slider settings"
+                        aria-label="Toggle slider settings">Range</button>
+                </div>
+                <div class="expression-slider-settings"
+                    data-id="${func.id}"
+                    hidden>
+                    <div class="expression-slider-settings-fields">
+                        <label class="expression-slider-setting">
+                            <span class="expression-slider-setting-label">Min</span>
+                            <input type="number"
+                                class="input expression-slider-setting-input"
+                                data-setting="min">
+                        </label>
+                        <label class="expression-slider-setting">
+                            <span class="expression-slider-setting-label">Max</span>
+                            <input type="number"
+                                class="input expression-slider-setting-input"
+                                data-setting="max">
+                        </label>
+                        <label class="expression-slider-setting">
+                            <span class="expression-slider-setting-label">Step</span>
+                            <input type="number"
+                                class="input expression-slider-setting-input"
+                                data-setting="step">
+                        </label>
+                    </div>
+                    <button class="button button-secondary button-small expression-slider-reset"
+                        type="button"
+                        data-id="${func.id}">Reset</button>
+                </div>
+            </div>
         </div>
-        <button class="button button-text button-medium" data-id="${func.id}" title="Delete" aria-label="Delete expression"><span class="icon icon-trash icon-medium"></span></button>
+        <button class="button button-text button-medium"
+            data-id="${func.id}"
+            title="Delete"
+            aria-label="Delete expression">
+            <span class="icon icon-trash icon-medium"></span>
+        </button>
       `;
 
         // Get references to DOM elements
         const input = item.querySelector('.expression-input');
         const latexEl = item.querySelector('.expression-latex');
         const colorBtn = item.querySelector('.expression-color');
-        const deleteBtn = item.querySelector('button[data-id]');
+        const deleteBtn = item.querySelector('button[aria-label="Delete expression"]');
         const errorEl = item.querySelector('.expression-error');
         const sliderContainer = item.querySelector(`#slider-container-${func.id}`);
+        const sliderHost = item.querySelector('.expression-slider');
+        const settingsToggle = item.querySelector('.expression-slider-toggle');
+        const settingsPanel = item.querySelector('.expression-slider-settings');
+        const settingsInputs = settingsPanel
+            ? Array.from(settingsPanel.querySelectorAll('.expression-slider-setting-input'))
+            : [];
+        const settingsReset = item.querySelector('.expression-slider-reset');
 
         // Event Listeners
         input.addEventListener('input', (e) => {
@@ -262,6 +372,13 @@ export default class ExpressionList {
         input.addEventListener('blur', () => {
             this.handleExpressionCommit(func.id);
             this.switchToLatexDisplay(func.id);
+            // Check for auto-conversion after blur (input no longer focused)
+            const functions = StateManager.get('functions') || [];
+            const currentFunc = functions.find(f => f.id === func.id);
+            const item = this.renderedItems.get(func.id);
+            if (currentFunc && item) {
+                this.reconcileSlider(currentFunc, item);
+            }
         });
 
         input.addEventListener('keydown', (e) => {
@@ -283,6 +400,32 @@ export default class ExpressionList {
             this.deleteExpression(func.id);
         });
 
+        if (settingsToggle) {
+            settingsToggle.addEventListener('click', () => {
+                this.toggleSliderSettings(func.id);
+            });
+        }
+
+        if (settingsReset) {
+            settingsReset.addEventListener('click', () => {
+                this.resetSliderSettings(func.id);
+            });
+        }
+
+        if (settingsInputs.length > 0) {
+            const commitSettings = () => this.commitSliderSettings(func.id);
+            settingsInputs.forEach(inputEl => {
+                inputEl.addEventListener('change', commitSettings);
+                inputEl.addEventListener('blur', commitSettings);
+                inputEl.addEventListener('keydown', (e) => {
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        inputEl.blur();
+                    }
+                });
+            });
+        }
+
         // Store item data
         const itemData = {
             element: item,
@@ -291,12 +434,19 @@ export default class ExpressionList {
             colorEl: colorBtn,
             errorEl: errorEl,
             sliderContainer: sliderContainer,
+            sliderHost: sliderHost,
+            settingsToggle: settingsToggle,
+            settingsPanel: settingsPanel,
+            settingsInputs: settingsInputs,
+            settingsReset: settingsReset,
+            settingsOpen: false,
             slider: null,
             lastColor: func.color,
             paramName: null,
             isEditing: !func.expression || func.expression.trim() === '',
             lastExpression: func.expression,
-            editStartExpression: undefined // Track expression at edit start for commit-boundary logging
+            // Track expression at edit start for commit-boundary logging
+            editStartExpression: undefined
         };
 
         // Capture starting expression for new empty expressions that start in edit mode
@@ -372,8 +522,9 @@ export default class ExpressionList {
         if (isInputFocused) return false;
 
         const paramName = param.paramName;
-        const defaultVal = 1.0; // Default value for new parameters (matches GraphEngine)
-        const newExpr = `${paramName} = ${defaultVal}`;
+        const defaultVal = DEFAULT_PARAMETER.value;
+        const formatted = this.formatValue(defaultVal, DEFAULT_PARAMETER.step);
+        const newExpr = `${paramName} = ${formatted}`;
 
         this.updateExpression(func.id, newExpr);
         return true; // Conversion happened, should return early
@@ -391,21 +542,35 @@ export default class ExpressionList {
         item.sliderInteractionActive = false;
         item.sliderEditStartExpr = null;
 
-        const slider = new NumericSlider(item.sliderContainer, {
+        const paramConfig = this.setParameterConfig(
+            paramName,
+            { value },
+            { silent: true, expandRange: true }
+        );
+
+        const sliderTarget = item.sliderHost || item.sliderContainer;
+        if (!sliderTarget) return;
+
+        const slider = new NumericSlider(sliderTarget, {
             type: 'single',
-            min: -10,
-            max: 10,
-            step: 0.1,
-            value: value,
+            min: paramConfig.min,
+            max: paramConfig.max,
+            step: paramConfig.step,
+            value: paramConfig.value,
             showInputs: false,
             continuousUpdates: true,
             onChange: (newValue) => {
-                // Format the value to the nearest 0.1
-                const roundedValue = Math.round(newValue / 0.1) * 0.1;
-                const formattedValue = Number(roundedValue.toFixed(1));
-
-                // Update Control State
-                StateManager.set(`controls.${paramName}`, formattedValue, { silent: true });
+                const currentConfig = this.getParameterConfig(paramName);
+                const roundedValue = this.roundToStep(newValue, currentConfig.step);
+                const nextConfig = this.setParameterConfig(
+                    paramName,
+                    { value: roundedValue },
+                    { silent: true }
+                );
+                const formattedValue = this.formatValue(
+                    nextConfig.value,
+                    nextConfig.step
+                );
 
                 // Update Expression Text to match
                 const newExpr = `${paramName} = ${formattedValue}`;
@@ -419,7 +584,9 @@ export default class ExpressionList {
                     // Discrete change - capture old expression before update
                     const functions = StateManager.get('functions') || [];
                     const currentFunc = functions.find(f => f.id === func.id);
-                    oldExprForDiscrete = currentFunc ? currentFunc.expression : func.expression;
+                    oldExprForDiscrete = currentFunc
+                        ? currentFunc.expression
+                        : func.expression;
                 }
 
                 // Capture start expression when drag begins
@@ -428,7 +595,9 @@ export default class ExpressionList {
                     // Get current expression from state before update
                     const functions = StateManager.get('functions') || [];
                     const currentFunc = functions.find(f => f.id === func.id);
-                    item.sliderEditStartExpr = currentFunc ? currentFunc.expression : func.expression;
+                    item.sliderEditStartExpr = currentFunc
+                        ? currentFunc.expression
+                        : func.expression;
                 }
 
                 // Update local input value immediately for responsiveness
@@ -438,7 +607,9 @@ export default class ExpressionList {
                 this.updateExpression(func.id, newExpr);
 
                 // Publish event for graph
-                EventBus.publish('controls:updated', { [paramName]: formattedValue });
+                EventBus.publish('parameters:updated', {
+                    [paramName]: nextConfig.value
+                });
 
                 // Log user action on interaction end (drag end) or discrete change (non-drag)
                 if (!isDragging) {
@@ -460,11 +631,7 @@ export default class ExpressionList {
         item.slider = slider;
         item.paramName = paramName;
 
-        // Ensure the control exists in StateManager
-        const currentControl = StateManager.get(`controls.${paramName}`);
-        if (currentControl === undefined || currentControl !== value) {
-            StateManager.set(`controls.${paramName}`, value, { silent: true });
-        }
+        this.syncSliderSettingsInputs(item, paramConfig);
     }
 
     /**
@@ -476,8 +643,16 @@ export default class ExpressionList {
             item.slider.destroy();
             item.slider = null;
             item.paramName = null;
-            item.sliderContainer.innerHTML = '';
+            if (item.sliderHost) {
+                item.sliderHost.innerHTML = '';
+            }
         }
+
+        if (item.settingsPanel) {
+            item.settingsPanel.hidden = true;
+        }
+
+        item.settingsOpen = false;
     }
 
     /**
@@ -486,7 +661,7 @@ export default class ExpressionList {
      * @param {Object} item - Item data from renderedItems Map
      */
     reconcileSlider(func, item) {
-        const assignment = this.parser.isAssignmentExpression(func.expression, this.debug);
+        const classification = classifyLine(func.expression, this.parser);
         const param = this.parser.isParameter(func.expression);
 
         // Handle auto-conversion of parameter to assignment
@@ -494,26 +669,48 @@ export default class ExpressionList {
             return; // Conversion happened, will trigger re-render
         }
 
-        // Create slider for assignment expressions
-        if (assignment.isAssignment && !item.slider) {
-            this.createSliderForAssignment(func, item, assignment.paramName, assignment.value);
+        const isAssignment = classification.kind === 'assignment' &&
+            classification.paramName;
+
+        if (!isAssignment) {
+            if (item.slider) {
+                this.destroySlider(item);
+            }
+            if (item.sliderContainer) {
+                item.sliderContainer.style.display = 'none';
+            }
             return;
         }
 
-        // Destroy slider if expression is no longer a parameter
-        if (!assignment.isAssignment && !param.isParameter && item.slider) {
-            this.destroySlider(item);
-            return;
+        const paramName = classification.paramName;
+        const value = classification.value;
+
+        if (!item.slider || item.paramName !== paramName) {
+            if (item.slider) {
+                this.destroySlider(item);
+            }
+            this.createSliderForAssignment(func, item, paramName, value);
         }
 
-        // Update slider value if assignment value changed externally
-        if (assignment.isAssignment && item.slider) {
-            const val = assignment.value;
-            const currentValue = item.slider.getValue();
-            if (currentValue !== val && !item.slider.isDragging) {
-                item.slider.setValue(val, null, false);
+        if (item.sliderContainer) {
+            item.sliderContainer.style.display = 'block';
+        }
+
+        const paramConfig = this.getParameterConfig(paramName, value);
+
+        if (item.slider && !item.slider.isDragging) {
+            const needsRangeUpdate = item.slider.config.min !== paramConfig.min ||
+                item.slider.config.max !== paramConfig.max ||
+                item.slider.config.step !== paramConfig.step;
+
+            if (needsRangeUpdate) {
+                this.applySliderConfig(item, paramConfig);
+            } else if (item.slider.getValue() !== paramConfig.value) {
+                item.slider.setValue(paramConfig.value, null, false);
             }
         }
+
+        this.syncSliderSettingsInputs(item, paramConfig);
     }
 
     /**
@@ -592,19 +789,235 @@ export default class ExpressionList {
         return div.innerHTML;
     }
 
+    roundToStep(value, step) {
+        if (!Number.isFinite(step) || step <= 0) {
+            return value;
+        }
+        const scaled = value / step;
+        return Math.round(scaled) * step;
+    }
+
+    getStepDecimals(step) {
+        if (!Number.isFinite(step)) return 0;
+        const stepString = step.toString();
+        if (stepString.includes('e-')) {
+            const parts = stepString.split('e-');
+            return Number(parts[1]) || 0;
+        }
+        if (stepString.includes('.')) {
+            return stepString.split('.')[1].length;
+        }
+        return 0;
+    }
+
+    formatValue(value, step) {
+        const decimals = this.getStepDecimals(step);
+        const rounded = this.roundToStep(value, step);
+        if (decimals === 0) {
+            return `${Math.round(rounded)}`;
+        }
+        return rounded.toFixed(decimals);
+    }
+
+    normalizeParameterConfig(config) {
+        const toNumber = (val, fallback) => (
+            Number.isFinite(val) ? Number(val) : fallback
+        );
+
+        const normalized = {
+            ...DEFAULT_PARAMETER,
+            ...config
+        };
+
+        normalized.min = toNumber(normalized.min, DEFAULT_PARAMETER.min);
+        normalized.max = toNumber(normalized.max, DEFAULT_PARAMETER.max);
+        normalized.step = toNumber(normalized.step, DEFAULT_PARAMETER.step);
+
+        if (normalized.step <= 0) {
+            normalized.step = DEFAULT_PARAMETER.step;
+        }
+
+        if (normalized.min > normalized.max) {
+            const swap = normalized.min;
+            normalized.min = normalized.max;
+            normalized.max = swap;
+        }
+
+        const rawValue = toNumber(normalized.value, DEFAULT_PARAMETER.value);
+        const clamped = Math.min(Math.max(rawValue, normalized.min), normalized.max);
+        normalized.value = this.roundToStep(clamped, normalized.step);
+
+        return normalized;
+    }
+
+    getParameterConfig(paramName, fallbackValue = null) {
+        const parameters = StateManager.get('parameters') || {};
+        const existing = parameters[paramName] || {};
+        const base = {
+            ...existing
+        };
+
+        if (Number.isFinite(fallbackValue)) {
+            base.value = fallbackValue;
+        }
+
+        return this.normalizeParameterConfig(base);
+    }
+
+    hasParameterChanged(current, next) {
+        if (!current) return true;
+        return current.value !== next.value ||
+            current.min !== next.min ||
+            current.max !== next.max ||
+            current.step !== next.step;
+    }
+
+    setParameterConfig(paramName, updates, options = {}) {
+        const parameters = StateManager.get('parameters') || {};
+        const existing = parameters[paramName] || {};
+        const expandRange = options.expandRange === true;
+        const draft = { ...existing, ...updates };
+
+        if (expandRange && Number.isFinite(draft.value)) {
+            if (!('min' in updates) && Number.isFinite(draft.min) && draft.value < draft.min) {
+                draft.min = draft.value;
+            }
+            if (!('max' in updates) && Number.isFinite(draft.max) && draft.value > draft.max) {
+                draft.max = draft.value;
+            }
+        }
+
+        const next = this.normalizeParameterConfig(draft);
+
+        if (this.hasParameterChanged(existing, next)) {
+            StateManager.set(`parameters.${paramName}`, next, options);
+        }
+
+        return next;
+    }
+
+    applySliderConfig(item, config) {
+        if (!item.slider) return;
+
+        item.slider.config.min = config.min;
+        item.slider.config.max = config.max;
+        item.slider.config.step = config.step;
+
+        if (item.slider.wrapper) {
+            item.slider.wrapper.setAttribute('aria-valuemin', config.min);
+            item.slider.wrapper.setAttribute('aria-valuemax', config.max);
+        }
+
+        item.slider.setValue(config.value, null, false);
+    }
+
+    syncSliderSettingsInputs(item, config) {
+        if (!item.settingsInputs || item.settingsInputs.length === 0) return;
+        item.settingsInputs.forEach(inputEl => {
+            const key = inputEl.dataset.setting;
+            if (key && config[key] !== undefined) {
+                inputEl.value = config[key];
+            }
+        });
+    }
+
+    toggleSliderSettings(id) {
+        const item = this.renderedItems.get(id);
+        if (!item || !item.settingsPanel) return;
+
+        item.settingsOpen = !item.settingsOpen;
+        item.settingsPanel.hidden = !item.settingsOpen;
+        if (item.settingsToggle) {
+            item.settingsToggle.classList.toggle('is-open', item.settingsOpen);
+        }
+    }
+
+    commitSliderSettings(id) {
+        const item = this.renderedItems.get(id);
+        if (!item || !item.paramName) return;
+
+        const current = this.getParameterConfig(item.paramName);
+        const updates = {};
+
+        item.settingsInputs.forEach(inputEl => {
+            const key = inputEl.dataset.setting;
+            const value = Number.parseFloat(inputEl.value);
+            if (key && Number.isFinite(value)) {
+                updates[key] = value;
+            }
+        });
+
+        const next = this.setParameterConfig(item.paramName, updates);
+
+        if (item.slider && !item.slider.isDragging) {
+            this.applySliderConfig(item, next);
+        }
+
+        this.syncSliderSettingsInputs(item, next);
+
+        if (next.value !== current.value) {
+            const formatted = this.formatValue(next.value, next.step);
+            this.updateExpression(id, `${item.paramName} = ${formatted}`);
+            EventBus.publish('parameters:updated', {
+                [item.paramName]: next.value
+            });
+        }
+    }
+
+    resetSliderSettings(id) {
+        const item = this.renderedItems.get(id);
+        if (!item || !item.paramName) return;
+
+        const current = this.getParameterConfig(item.paramName);
+        const updates = {
+            min: DEFAULT_PARAMETER.min,
+            max: DEFAULT_PARAMETER.max,
+            step: DEFAULT_PARAMETER.step
+        };
+
+        const next = this.setParameterConfig(item.paramName, updates);
+
+        if (item.slider && !item.slider.isDragging) {
+            this.applySliderConfig(item, next);
+        }
+
+        this.syncSliderSettingsInputs(item, next);
+
+        if (next.value !== current.value) {
+            const formatted = this.formatValue(next.value, next.step);
+            this.updateExpression(id, `${item.paramName} = ${formatted}`);
+            EventBus.publish('parameters:updated', {
+                [item.paramName]: next.value
+            });
+        }
+    }
+
     updateSlidersFromState() {
-        // Update sliders if controls changed externally (optional bi-directional sync)
-        const controls = StateManager.get('controls') || {};
-        this.renderedItems.forEach((item, id) => {
-            if (item.slider && item.paramName) {
-                const controlValue = controls[item.paramName];
-                if (controlValue !== undefined && !item.slider.isDragging) {
+        // Update sliders if parameters changed externally (e.g. assignment edits)
+        const parameters = StateManager.get('parameters') || {};
+        this.renderedItems.forEach(item => {
+            if (!item.slider || !item.paramName) return;
+            const paramConfig = parameters[item.paramName];
+            if (!paramConfig) return;
+
+            const normalized = this.normalizeParameterConfig(paramConfig);
+
+            if (!item.slider.isDragging) {
+                const needsRangeUpdate = item.slider.config.min !== normalized.min ||
+                    item.slider.config.max !== normalized.max ||
+                    item.slider.config.step !== normalized.step;
+
+                if (needsRangeUpdate) {
+                    this.applySliderConfig(item, normalized);
+                } else {
                     const currentValue = item.slider.getValue();
-                    if (currentValue !== controlValue) {
-                        item.slider.setValue(controlValue, null, false);
+                    if (currentValue !== normalized.value) {
+                        item.slider.setValue(normalized.value, null, false);
                     }
                 }
             }
+
+            this.syncSliderSettingsInputs(item, normalized);
         });
     }
 
@@ -651,8 +1064,7 @@ export default class ExpressionList {
         const currentFunctions = StateManager.get('functions') || [];
         const newId = this._generateExpressionId(currentFunctions);
         // Simple color cycle
-        const colors = ['#4A90E2', '#50E3C2', '#F5A623', '#D0021B', '#BD10E0', '#B8E986'];
-        const nextColor = colors[currentFunctions.length % colors.length];
+        const nextColor = COLORS[currentFunctions.length % COLORS.length];
 
         const newFunc = {
             id: newId,
@@ -672,28 +1084,32 @@ export default class ExpressionList {
         const index = functions.findIndex(f => f.id === id);
 
         if (index !== -1) {
-            // Validate expression and extract error
-            let error = null;
-            if (newExpression && newExpression.trim() !== '') {
-                const parser = new ExpressionParser();
-                try {
-                    // Get all variables that might be in scope (x + any controls)
-                    const controls = StateManager.get('controls') || {};
-                    const variables = ['x', ...Object.keys(controls)];
-                    const parsed = parser.parse(newExpression, variables);
-                    if (!parsed.isValid) {
-                        error = parsed.error;
-                    }
-                } catch (e) {
-                    // If parsing throws, use the error message
-                    error = e.message || 'Invalid expression';
-                }
-            }
-            // Empty expressions are allowed (no error)
+            const classification = classifyLine(newExpression, this.parser);
+            const nextFunc = {
+                ...functions[index],
+                expression: newExpression,
+                error: classification.error,
+                kind: classification.kind,
+                paramName: classification.paramName ?? null,
+                value: classification.value ?? null,
+                usedVariables: classification.usedVariables ?? [],
+                plotExpression: classification.plotExpression ?? null
+            };
 
-            functions[index] = { ...functions[index], expression: newExpression, error };
+            functions[index] = nextFunc;
             StateManager.set('functions', functions);
             EventBus.publish('expression:updated', functions);
+
+            if (classification.kind === 'assignment' && classification.paramName) {
+                const nextConfig = this.setParameterConfig(
+                    classification.paramName,
+                    { value: classification.value },
+                    { merge: true, expandRange: true }
+                );
+                EventBus.publish('parameters:updated', {
+                    [classification.paramName]: nextConfig.value
+                });
+            }
         }
     }
 

@@ -200,6 +200,56 @@ html, body {
   border-color: var(--Colors-Alert-Error-Default);
 }
 
+.expression-slider-container {
+  display: none;
+  margin-top: var(--UI-Spacing-spacing-s);
+}
+
+.expression-slider-row {
+  display: flex;
+  align-items: center;
+  gap: var(--UI-Spacing-spacing-s);
+}
+
+.expression-slider {
+  flex: 1;
+  min-width: 0;
+}
+
+.expression-slider-toggle.is-open {
+  color: var(--Colors-Text-Body-Strongest);
+}
+
+.expression-slider-settings {
+  margin-top: var(--UI-Spacing-spacing-xs);
+  padding: var(--UI-Spacing-spacing-xs);
+  border: 1px solid var(--Colors-Stroke-Default);
+  border-radius: var(--UI-Radius-radius-s);
+  background: var(--Colors-Backgrounds-Main-Default);
+}
+
+.expression-slider-settings-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: var(--UI-Spacing-spacing-xs);
+  margin-bottom: var(--UI-Spacing-spacing-xs);
+}
+
+.expression-slider-setting {
+  display: flex;
+  flex-direction: column;
+  gap: var(--UI-Spacing-spacing-xxs);
+}
+
+.expression-slider-setting-label {
+  font-size: var(--Fonts-Body-Default-xs);
+  color: var(--Colors-Text-Body-Medium);
+}
+
+.expression-slider-setting-input {
+  width: 100%;
+}
+
 
 /* Sidebar */
 .sidebar {

@@ -7,16 +7,16 @@
  * State structure:
  * {
  *   config: {},           // Activity configuration (functions, graph)
- *   controls: {},         // Runtime control values (dynamically created from expression variables)
+ *   parameters: {},       // Runtime parameter values + slider metadata
  *   functions: [],        // Function expressions
  *   graph: {},           // Graph viewport and display settings
  *   status: 'ready'       // Application status
  * }
  *
  * Usage:
- *   StateManager.set('controls.m', 5);
- *   StateManager.subscribe('controls.m', (value) => console.log(value));
- *   const value = StateManager.get('controls.m');
+ *   StateManager.set('parameters.m.value', 5);
+ *   StateManager.subscribe('parameters.m', (value) => console.log(value));
+ *   const value = StateManager.get('parameters.m.value');
  */
 
 import EventBus from './event-bus.js';
@@ -25,7 +25,7 @@ class StateManagerClass {
   constructor() {
     this.state = {
       config: null,
-      controls: {},
+      parameters: {},
       functions: [],
       status: 'initializing',
       errors: []
@@ -59,7 +59,7 @@ class StateManagerClass {
       }));
     }
 
-    // Note: controls are runtime state, dynamically created by GraphEngine
+    // Note: parameters are runtime state, dynamically created by GraphEngine
     // from expression variables (e.g., 'm', 'b' in 'm*x + b')
 
     if (this.debug) {
@@ -71,7 +71,7 @@ class StateManagerClass {
 
   /**
    * Get state value at path
-   * @param {string} path - Dot-separated path (e.g., 'controls.x-point')
+   * @param {string} path - Dot-separated path (e.g., 'parameters.m.value')
    * @returns {*} Value at path
    */
   get(path) {
@@ -90,6 +90,19 @@ class StateManagerClass {
     }
 
     return value;
+  }
+
+  /**
+   * Get parameter values as a plain scope object for evaluation
+   * @returns {Object} Map of parameter names to numeric values
+   */
+  getControlValues() {
+    const parameters = this.get('parameters') || {};
+    return Object.fromEntries(
+      Object.entries(parameters)
+        .filter(([, value]) => typeof value?.value === 'number')
+        .map(([key, value]) => [key, value.value])
+    );
   }
 
   /**
@@ -256,7 +269,7 @@ class StateManagerClass {
       });
     }
 
-    // Notify parent path subscribers (e.g., 'controls' for 'controls.x-point')
+    // Notify parent path subscribers (e.g., 'parameters' for 'parameters.m.value')
     const pathParts = path.split('.');
 
     for (let i = pathParts.length - 1; i > 0; i--) {
@@ -285,7 +298,7 @@ class StateManagerClass {
 
     this.state = {
       config: null,
-      controls: {},
+      parameters: {},
       functions: [],
       status: 'ready',
       errors: []
@@ -359,11 +372,17 @@ class StateManagerClass {
    */
   validate(path, value) {
     // Add validation logic as needed
-    // Controls are runtime state (dynamically created from expression variables)
-    // Basic validation: ensure controls are numbers
-    if (path.startsWith('controls.')) {
-      if (typeof value !== 'number') {
-        return false;
+    // Parameters are runtime state with numeric values + metadata.
+    if (path.startsWith('parameters.')) {
+      if (typeof value === 'number') {
+        return true;
+      }
+
+      if (value && typeof value === 'object') {
+        if ('value' in value && typeof value.value !== 'number') return false;
+        if ('min' in value && typeof value.min !== 'number') return false;
+        if ('max' in value && typeof value.max !== 'number') return false;
+        if ('step' in value && typeof value.step !== 'number') return false;
       }
     }
 

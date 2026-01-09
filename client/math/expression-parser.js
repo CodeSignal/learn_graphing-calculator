@@ -246,74 +246,48 @@ export default class ExpressionParser {
   }
 
   /**
-   * Check if an expression is a parameter assignment using AST parsing
+   * Parse assignment syntax - pure syntax detection without semantic filtering
+   * Identifies assignment structure (lhs = rhs) regardless of symbol names
    * @param {string} expression - Expression string to check
-   * @param {boolean} debug - Whether to log debug warnings
-   * @returns {{isAssignment: boolean, paramName: string|null, value: number|null}} Result object
+   * @returns {{isAssignment: boolean, lhs: string|null, rhs: string|null}} Result object
    */
-  isAssignmentExpression(expression, debug = false) {
+  parseAssignmentSyntax(expression) {
     if (!expression || typeof expression !== 'string') {
-      return { isAssignment: false, paramName: null, value: null };
+      return { isAssignment: false, lhs: null, rhs: null };
     }
 
     try {
-      const node = math.parse(expression.trim());
+      const trimmed = expression.trim();
+      const node = math.parse(trimmed);
 
       // Check if root node is an AssignmentNode
       if (node.type !== 'AssignmentNode') {
-        return { isAssignment: false, paramName: null, value: null };
+        return { isAssignment: false, lhs: null, rhs: null };
       }
 
-      // Extract parameter name from left-hand side (should be a SymbolNode)
-      let paramName = null;
+      // Extract left-hand side symbol name (should be a SymbolNode)
+      let lhs = null;
       if (node.object && node.object.type === 'SymbolNode') {
-        paramName = node.object.name;
+        lhs = node.object.name;
       } else {
-        // Not a simple parameter assignment (e.g., array[index] = value)
-        return { isAssignment: false, paramName: null, value: null };
+        // Not a simple assignment (e.g., array[index] = value)
+        return { isAssignment: false, lhs: null, rhs: null };
       }
 
-      // Reject reserved variables x and y
-      if (paramName === 'x' || paramName === 'y') {
-        return { isAssignment: false, paramName: null, value: null };
-      }
-
-      // Extract value from right-hand side
-      let value = null;
+      // Extract right-hand side expression string
+      let rhs = null;
       if (node.value) {
-        if (node.value.type === 'ConstantNode') {
-          // Direct constant (e.g., 5, -3.14)
-          value = node.value.value;
-        } else {
-          // Try to evaluate the expression (e.g., 1 + 2, pi, sin(1))
-          try {
-            const compiled = node.value.compile();
-            value = compiled.evaluate();
-            // Ensure it's a finite number
-            if (!isFinite(value) || isNaN(value)) {
-              value = null;
-            }
-          } catch (e) {
-            // Evaluation failed (e.g., contains variables)
-            if (debug) {
-              console.warn(`[ExpressionParser] Could not evaluate assignment value: ${expression}`, e);
-            }
-            return { isAssignment: false, paramName: null, value: null };
-          }
-        }
+        // Get the string representation of the RHS
+        rhs = node.value.toString();
       }
 
-      // Only return success if we have both parameter name and numeric value
-      if (paramName && value !== null && isFinite(value)) {
-        return { isAssignment: true, paramName, value };
-      }
-
-      return { isAssignment: false, paramName: null, value: null };
+      return { isAssignment: true, lhs, rhs };
     } catch (error) {
       // Parsing failed - not an assignment or invalid expression
-      return { isAssignment: false, paramName: null, value: null };
+      return { isAssignment: false, lhs: null, rhs: null };
     }
   }
+
 
   /**
    * Get list of constant names that should be excluded from variable detection
@@ -358,7 +332,7 @@ export default class ExpressionParser {
       }
     });
 
-    return Array.from(variables);
+    return Array.from(variables).sort();
   }
 
   /**
