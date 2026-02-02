@@ -11,6 +11,13 @@
  * Event naming convention:
  *   - Use colon-separated namespaces: 'module:action'
  *   - Examples: 'state:changed', 'control:updated', 'render:complete'
+ *
+ * State change events:
+ *   - Callback signature: callback(data, eventName) where data = {path, value, oldValue}
+ *   - Parent path bubbling: Subscribing to 'state:changed:parameters' also receives
+ *     notifications for 'state:changed:parameters.m.value'
+ *   - Immediate option: Use { immediate: true } to receive current value on subscription.
+ *     Requires StateManager injection via setStateManager() (also used for parent bubbling).
  */
 
 class EventBusClass {
@@ -19,6 +26,7 @@ class EventBusClass {
     this.eventHistory = [];
     this.maxHistory = 100;
     this.debug = false;
+    this.stateManager = null;
   }
 
   /**
@@ -27,6 +35,7 @@ class EventBusClass {
    * @param {Function} callback - Function to call when event is published
    * @param {Object} options - Optional configuration
    * @param {boolean} options.once - Only trigger once, then unsubscribe
+   * @param {boolean} options.immediate - For state:changed:* events, call immediately with current value
    * @returns {Function} Unsubscribe function
    */
   subscribe(eventName, callback, options = {}) {
@@ -53,6 +62,29 @@ class EventBusClass {
 
     if (this.debug) {
       console.log(`[EventBus] Subscribed to '${eventName}'`, subscriber.id);
+    }
+
+    // Call immediately with current value if requested (for state:changed:* events)
+    if (options.immediate && eventName.startsWith('state:changed:') && eventName !== 'state:changed') {
+      if (this.stateManager) {
+        try {
+          const path = eventName.replace('state:changed:', '');
+          const currentValue = this.stateManager.get(path);
+          const immediateData = {
+            path,
+            value: currentValue,
+            oldValue: undefined
+          };
+          callback(immediateData, eventName);
+        } catch (error) {
+          console.warn(`[EventBus] Error in immediate callback for '${eventName}':`, error);
+        }
+      } else {
+        // StateManager not injected yet - this is OK, will be called on next state change
+        if (this.debug) {
+          console.warn(`[EventBus] StateManager not available for immediate callback of '${eventName}'`);
+        }
+      }
     }
 
     // Return unsubscribe function
@@ -127,32 +159,13 @@ class EventBusClass {
       console.log(`[EventBus] Publishing '${eventName}'`, data);
     }
 
-    // Get subscribers for this specific event
-    const subscribers = this.subscribers.get(eventName);
-
-    if (!subscribers || subscribers.length === 0) {
-      if (this.debug) {
-        console.log(`[EventBus] No subscribers for '${eventName}'`);
-      }
-      return;
+    // Bubble parent paths for state:changed:* events
+    if (eventName.startsWith('state:changed:') && eventName !== 'state:changed') {
+      this._bubbleParentPaths(eventName, data);
     }
 
-    // Create a copy of subscribers array to avoid issues if subscribers modify the list
-    const subscribersCopy = [...subscribers];
-
-    // Call each subscriber
-    subscribersCopy.forEach(subscriber => {
-      try {
-        subscriber.callback(data, eventName);
-
-        // Remove if it's a one-time subscription
-        if (subscriber.once) {
-          this.unsubscribe(eventName, subscriber.id);
-        }
-      } catch (error) {
-        console.error(`[EventBus] Error in subscriber for '${eventName}':`, error);
-      }
-    });
+    // Notify subscribers
+    this._notifySubscribers(eventName, data);
   }
 
   /**
@@ -202,6 +215,15 @@ class EventBusClass {
   }
 
   /**
+   * Set StateManager instance for immediate callbacks
+   * Must be called during app initialization before components subscribe with immediate: true
+   * @param {Object} stateManager - StateManager instance
+   */
+  setStateManager(stateManager) {
+    this.stateManager = stateManager;
+  }
+
+  /**
    * Add event to history
    * @private
    */
@@ -224,6 +246,101 @@ class EventBusClass {
    */
   _generateId() {
     return `sub_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
+  }
+
+  /**
+   * Bubble parent paths for state:changed:* events
+   * For example, state:changed:parameters.m.value also fires:
+   * - state:changed:parameters.m
+   * - state:changed:parameters
+   * @private
+   * @param {string} eventName - Full event name (e.g., 'state:changed:parameters.m.value')
+   * @param {*} data - Event data
+   */
+  _bubbleParentPaths(eventName, data) {
+    // Extract path from event name: 'state:changed:parameters.m.value' -> 'parameters.m.value'
+    const path = eventName.replace('state:changed:', '');
+    if (!path) return;
+
+    // Parent bubbling needs StateManager to provide correct parent values.
+    if (!this.stateManager) {
+      if (this.debug) {
+        console.warn('[EventBus] StateManager not available for parent bubbling');
+      }
+      return;
+    }
+
+    // Split path by dots
+    const pathParts = path.split('.');
+    if (pathParts.length <= 1) return; // No parent paths for single-segment paths
+
+    // Generate parent paths and notify subscribers
+    // For 'parameters.m.value', generate: 'parameters.m', 'parameters'
+    for (let i = pathParts.length - 1; i > 0; i--) {
+      const parentPath = pathParts.slice(0, i).join('.');
+      const parentEventName = `state:changed:${parentPath}`;
+
+      // Parent subscribers should receive the current parent value, not the child value.
+      let parentValue;
+      try {
+        parentValue = this.stateManager.get(parentPath);
+      } catch (error) {
+        parentValue = undefined;
+        if (this.debug) {
+          console.warn(`[EventBus] Failed to read StateManager at '${parentPath}'`, error);
+        }
+      }
+
+      // Update payload for parent event
+      const parentData = {
+        ...data,
+        path: parentPath,
+        value: parentValue,
+        oldValue: undefined
+      };
+
+      // Notify subscribers for parent event (without adding to history or bubbling)
+      this._notifySubscribers(parentEventName, parentData);
+    }
+  }
+
+  /**
+   * Notify subscribers for an event without adding to history or bubbling
+   * Used internally by _bubbleParentPaths
+   * @private
+   * @param {string} eventName - Name of the event
+   * @param {*} data - Data to pass to subscribers
+   */
+  _notifySubscribers(eventName, data) {
+    const subscribers = this.subscribers.get(eventName);
+
+    if (!subscribers || subscribers.length === 0) {
+      if (this.debug) {
+        console.log(`[EventBus] No subscribers for '${eventName}'`);
+      }
+      return;
+    }
+
+    if (this.debug) {
+      console.log(`[EventBus] Notifying subscribers for '${eventName}'`, data);
+    }
+
+    // Create a copy of subscribers array to avoid issues if subscribers modify the list
+    const subscribersCopy = [...subscribers];
+
+    // Call each subscriber
+    subscribersCopy.forEach(subscriber => {
+      try {
+        subscriber.callback(data, eventName);
+
+        // Remove if it's a one-time subscription
+        if (subscriber.once) {
+          this.unsubscribe(eventName, subscriber.id);
+        }
+      } catch (error) {
+        console.error(`[EventBus] Error in subscriber for '${eventName}':`, error);
+      }
+    });
   }
 }
 

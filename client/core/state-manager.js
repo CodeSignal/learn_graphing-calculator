@@ -1,8 +1,9 @@
 /**
- * StateManager - Centralized reactive state management
+ * StateManager - Centralized state management
  *
- * Manages all application state with reactive updates through EventBus.
- * Components can subscribe to specific state keys and get notified of changes.
+ * Manages all application state. EventBus handles all notifications for state changes.
+ * Components should subscribe to EventBus events (e.g., 'state:changed:functions') rather
+ * than using StateManager subscriptions.
  *
  * State structure:
  * {
@@ -15,8 +16,9 @@
  *
  * Usage:
  *   StateManager.set('parameters.m.value', 5);
- *   StateManager.subscribe('parameters.m', (value) => console.log(value));
  *   const value = StateManager.get('parameters.m.value');
+ *   // Subscribe to changes via EventBus:
+ *   // EventBus.subscribe('state:changed:parameters.m', (data) => console.log(data.value));
  */
 
 import EventBus from './event-bus.js';
@@ -31,7 +33,6 @@ class StateManagerClass {
       errors: []
     };
 
-    this.subscribers = new Map();
     this.history = [];
     this.maxHistory = 50;
     this.debug = false;
@@ -166,9 +167,6 @@ class StateManagerClass {
         value,
         oldValue
       });
-
-      // Notify path subscribers
-      this._notifySubscribers(path, value, oldValue);
     }
   }
 
@@ -185,108 +183,6 @@ class StateManagerClass {
     // Emit single update event
     if (!options.silent) {
       EventBus.publish('state:updated', updates);
-    }
-  }
-
-  /**
-   * Subscribe to changes at a specific path
-   * @param {string} path - Dot-separated path
-   * @param {Function} callback - Function to call on change
-   * @param {Object} options - Optional configuration
-   * @param {boolean} options.immediate - Call immediately with current value
-   * @returns {Function} Unsubscribe function
-   */
-  subscribe(path, callback, options = {}) {
-    if (typeof callback !== 'function') {
-      throw new Error('Callback must be a function');
-    }
-
-    if (!this.subscribers.has(path)) {
-      this.subscribers.set(path, []);
-    }
-
-    const subscriber = {
-      callback,
-      id: this._generateId()
-    };
-
-    this.subscribers.get(path).push(subscriber);
-
-    if (this.debug) {
-      console.log(`[StateManager] Subscribed to '${path}'`, subscriber.id);
-    }
-
-    // Call immediately with current value if requested
-    if (options.immediate) {
-      const currentValue = this.get(path);
-      callback(currentValue, undefined, path);
-    }
-
-    // Return unsubscribe function
-    return () => this._unsubscribe(path, subscriber.id);
-  }
-
-  /**
-   * Unsubscribe from path
-   * @private
-   */
-  _unsubscribe(path, subscriberId) {
-    if (!this.subscribers.has(path)) {
-      return;
-    }
-
-    const subscribers = this.subscribers.get(path);
-    const index = subscribers.findIndex(sub => sub.id === subscriberId);
-
-    if (index !== -1) {
-      subscribers.splice(index, 1);
-
-      if (this.debug) {
-        console.log(`[StateManager] Unsubscribed from '${path}'`, subscriberId);
-      }
-    }
-
-    if (subscribers.length === 0) {
-      this.subscribers.delete(path);
-    }
-  }
-
-  /**
-   * Notify subscribers of a path change
-   * @private
-   */
-  _notifySubscribers(path, value, oldValue) {
-    // Notify exact path subscribers
-    if (this.subscribers.has(path)) {
-      const subscribers = [...this.subscribers.get(path)];
-
-      subscribers.forEach(subscriber => {
-        try {
-          subscriber.callback(value, oldValue, path);
-        } catch (error) {
-          console.error(`[StateManager] Error in subscriber for '${path}':`, error);
-        }
-      });
-    }
-
-    // Notify parent path subscribers (e.g., 'parameters' for 'parameters.m.value')
-    const pathParts = path.split('.');
-
-    for (let i = pathParts.length - 1; i > 0; i--) {
-      const parentPath = pathParts.slice(0, i).join('.');
-
-      if (this.subscribers.has(parentPath)) {
-        const parentValue = this.get(parentPath);
-        const subscribers = [...this.subscribers.get(parentPath)];
-
-        subscribers.forEach(subscriber => {
-          try {
-            subscriber.callback(parentValue, undefined, parentPath);
-          } catch (error) {
-            console.error(`[StateManager] Error in subscriber for '${parentPath}':`, error);
-          }
-        });
-      }
     }
   }
 
@@ -321,17 +217,6 @@ class StateManagerClass {
   }
 
   /**
-   * Clear all subscribers
-   */
-  clearSubscribers() {
-    this.subscribers.clear();
-
-    if (this.debug) {
-      console.log('[StateManager] Cleared all subscribers');
-    }
-  }
-
-  /**
    * Enable or disable debug mode
    * @param {boolean} enabled - Whether debug mode should be enabled
    */
@@ -354,14 +239,6 @@ class StateManagerClass {
     if (this.history.length > this.maxHistory) {
       this.history.shift();
     }
-  }
-
-  /**
-   * Generate unique subscriber ID
-   * @private
-   */
-  _generateId() {
-    return `sub_${Date.now()}_${Math.random().toString(36).slice(2, 11)}`;
   }
 
   /**

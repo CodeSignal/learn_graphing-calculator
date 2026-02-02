@@ -13,9 +13,13 @@ commands, or architecture.
    (`design-system/components/modal`).
 3. **State & events**:
    - Central store: `core/state-manager.js` (dot-path set/get, history,
-     validation, publishes events).
+     validation). StateManager manages state only; EventBus handles all notifications.
    - Pub/Sub: `core/event-bus.js` (namespaced events like `state:changed`,
-     `expression:updated`).
+     `expression:updated`). EventBus is the single notification mechanism for state changes.
+     Supports parent path bubbling (subscribing to `state:changed:parameters` also receives
+     notifications for `state:changed:parameters.m.value`), and bubbled parent events provide
+     the parent value (not the child value). Use `{ immediate: true }` to receive current
+     value on subscription (requires `EventBus.setStateManager(StateManager)` in app init).
 4. **Math layer**:
    - Parsing/validation: `math/expression-parser.js` (math.js wrapper, caches,
      requires `x`, optionally `y`; warns on unknown variables). Provides
@@ -75,6 +79,10 @@ commands, or architecture.
 - **Expressions**: LineClassifier defines line kinds; GraphEngine backfills
   parameter assignments for any extra symbols detected in graph lines (excluding
   x/y). Assignment lines never plot. Avoid loops when adding detection paths.
+- **Classification metadata**: `state.functions` entries may include derived
+  classification fields (`kind`, `error`, `paramName`, `value`, `usedVariables`,
+  `plotExpression`, `verticalLineX`) for UI consistency; GraphEngine still
+  classifies from `expression` on each render.
 - **Status text**: Stick to these exact strings:
   1. "Ready"
   2. "Loading..."
@@ -107,7 +115,7 @@ commands, or architecture.
 ## Testing & QA
 - **Automated tests**: Unit tests for math layer (e.g.,
   `expression-parser.test.js`) run with `npm run test` or `npm run test:run`.
-  Use Vitest; test files use `*.test.js` pattern in `client/` directory.
+  Use Vitest; tests live under `tests/` (and may also exist under `client/`).
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
   add/edit expressions, confirm canvas redraws, sliders appear for parameters
   (e.g., `a*sin(b*x)`), zoom/pan, help modal opens, status shows Ready.

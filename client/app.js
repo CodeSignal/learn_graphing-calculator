@@ -3,6 +3,7 @@
  */
 
 import StateManager from './core/state-manager.js';
+import EventBus from './core/event-bus.js';
 import ConfigLoader from './core/config-loader.js';
 import defaultConfig from './configs/default-config.js';
 import Modal from './design-system/components/modal/modal.js';
@@ -73,6 +74,10 @@ class App {
     }
 
     StateManager.initialize(config);
+
+    // Inject StateManager into EventBus for immediate callbacks
+    // This must be done before components subscribe with immediate: true
+    EventBus.setStateManager(StateManager);
   }
 
   /**

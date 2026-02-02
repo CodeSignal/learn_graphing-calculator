@@ -18,7 +18,6 @@ export default class ExpressionList {
         this.container = document.getElementById(containerId);
         this.addButton = document.getElementById(addButtonId);
         this.boundRender = this.render.bind(this);
-        this.boundHandleFunctions = this.handleFunctionsUpdate.bind(this);
         // id -> { element, slider, inputEl, latexEl, colorEl, errorEl, sliderContainer, ... }
         this.renderedItems = new Map();
         this.unsubscribers = [];
@@ -32,13 +31,12 @@ export default class ExpressionList {
             return;
         }
 
-        // Subscribe to functions changes
+        // Subscribe to functions changes via EventBus
         this.unsubscribers.push(
-            StateManager.subscribe('functions', this.boundHandleFunctions)
+            EventBus.subscribe('state:changed:functions', (data) => {
+                this.handleFunctionsUpdate(data.value);
+            }, { immediate: true })
         );
-
-        // Initial render
-        this.handleFunctionsUpdate(StateManager.get('functions'));
 
         // Bind Add Button
         this.addButton.addEventListener('click', () => {
@@ -47,9 +45,9 @@ export default class ExpressionList {
 
         // Subscribe to parameter changes to update slider values if changed externally
         this.unsubscribers.push(
-            StateManager.subscribe('parameters', () => {
+            EventBus.subscribe('state:changed:parameters', () => {
                 this.updateSlidersFromState();
-            })
+            }, { immediate: true })
         );
     }
 
@@ -110,21 +108,30 @@ export default class ExpressionList {
         this.ensureButtonPosition();
     }
 
+    getClassificationMetadata(expression, classificationOverride = null) {
+        const classification = classificationOverride ??
+            classifyLine(expression || '', this.parser);
+
+        return {
+            error: classification.error ?? null,
+            kind: classification.kind,
+            paramName: classification.paramName ?? null,
+            value: classification.value ?? null,
+            usedVariables: Array.isArray(classification.usedVariables)
+                ? classification.usedVariables
+                : [],
+            plotExpression: classification.plotExpression ?? null,
+            verticalLineX: classification.verticalLineX ?? null
+        };
+    }
+
     handleFunctionsUpdate(functions) {
         if (!functions) return;
 
         const updated = functions.map(func => {
-            const expression = func.expression || '';
-            const classification = classifyLine(expression, this.parser);
-
             return {
                 ...func,
-                error: classification.error,
-                kind: classification.kind,
-                paramName: classification.paramName ?? null,
-                value: classification.value ?? null,
-                usedVariables: classification.usedVariables ?? [],
-                plotExpression: classification.plotExpression ?? null
+                ...this.getClassificationMetadata(func.expression)
             };
         });
 
@@ -134,14 +141,18 @@ export default class ExpressionList {
 
             const prevVars = prev.usedVariables || [];
             const nextVars = nextFunc.usedVariables || [];
+            const prevVarsSet = new Set(prevVars);
+            const nextVarsSet = new Set(nextVars);
             const varsMatch = prevVars.length === nextVars.length &&
-                prevVars.every((val, i) => val === nextVars[i]);
+                prevVars.every(val => nextVarsSet.has(val)) &&
+                nextVars.every(val => prevVarsSet.has(val));
 
             return prev.error !== nextFunc.error ||
                 prev.kind !== nextFunc.kind ||
                 prev.paramName !== nextFunc.paramName ||
                 prev.value !== nextFunc.value ||
                 prev.plotExpression !== nextFunc.plotExpression ||
+                prev.verticalLineX !== nextFunc.verticalLineX ||
                 !varsMatch;
         });
 
@@ -1088,12 +1099,7 @@ export default class ExpressionList {
             const nextFunc = {
                 ...functions[index],
                 expression: newExpression,
-                error: classification.error,
-                kind: classification.kind,
-                paramName: classification.paramName ?? null,
-                value: classification.value ?? null,
-                usedVariables: classification.usedVariables ?? [],
-                plotExpression: classification.plotExpression ?? null
+                ...this.getClassificationMetadata(newExpression, classification)
             };
 
             functions[index] = nextFunc;

@@ -23,6 +23,8 @@ styling is a last resort.
 
 ## Interaction model
 - State flows through `core/state-manager.js`; events through `core/event-bus.js`.
+- App initialization must call `EventBus.setStateManager(StateManager)` before components
+  subscribe with `{ immediate: true }` or rely on bubbled parent `state:changed:*` payloads.
 - GraphEngine listens to:
   - `state:changed` for viewport resets
   - `expression:updated` for live expression edits
@@ -40,6 +42,9 @@ styling is a last resort.
 ## Utilities
 - Line classification lives in `math/line-classifier.js` and is the single
   source of truth for line kinds.
+- `state.functions` entries may include derived classification metadata
+  (`kind`, `error`, `paramName`, `value`, `usedVariables`, `plotExpression`,
+  `verticalLineX`) normalized by ExpressionList.
 - `math/shared-parser.js` provides a shared ExpressionParser instance for
   caching across components.
 - ExpressionList still uses `ExpressionParser.isParameter()` for optional
