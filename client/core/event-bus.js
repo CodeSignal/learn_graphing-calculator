@@ -23,8 +23,6 @@
 class EventBusClass {
   constructor() {
     this.subscribers = new Map();
-    this.eventHistory = [];
-    this.maxHistory = 100;
     this.debug = false;
     this.stateManager = null;
   }
@@ -152,9 +150,6 @@ class EventBusClass {
       throw new Error('Event name must be a string');
     }
 
-    // Store in history
-    this._addToHistory(eventName, data);
-
     if (this.debug) {
       console.log(`[EventBus] Publishing '${eventName}'`, data);
     }
@@ -187,15 +182,6 @@ class EventBusClass {
   }
 
   /**
-   * Get event history
-   * @param {number} count - Number of recent events to return
-   * @returns {Array} Array of recent events
-   */
-  getHistory(count = 10) {
-    return this.eventHistory.slice(-count);
-  }
-
-  /**
    * Clear all subscribers
    */
   clear() {
@@ -221,23 +207,6 @@ class EventBusClass {
    */
   setStateManager(stateManager) {
     this.stateManager = stateManager;
-  }
-
-  /**
-   * Add event to history
-   * @private
-   */
-  _addToHistory(eventName, data) {
-    this.eventHistory.push({
-      eventName,
-      data,
-      timestamp: Date.now()
-    });
-
-    // Keep history size limited
-    if (this.eventHistory.length > this.maxHistory) {
-      this.eventHistory.shift();
-    }
   }
 
   /**

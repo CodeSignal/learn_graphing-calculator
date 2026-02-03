@@ -33,8 +33,6 @@ class StateManagerClass {
       errors: []
     };
 
-    this.history = [];
-    this.maxHistory = 50;
     this.debug = false;
   }
 
@@ -145,9 +143,6 @@ class StateManagerClass {
       current[finalKey] = value;
     }
 
-    // Add to history
-    this._addToHistory(path, oldValue, value);
-
     if (this.debug) {
       console.log(`[StateManager] Set '${path}':`, value);
     }
@@ -208,37 +203,11 @@ class StateManagerClass {
   }
 
   /**
-   * Get state history
-   * @param {number} count - Number of recent changes
-   * @returns {Array} Recent state changes
-   */
-  getHistory(count = 10) {
-    return this.history.slice(-count);
-  }
-
-  /**
    * Enable or disable debug mode
    * @param {boolean} enabled - Whether debug mode should be enabled
    */
   setDebug(enabled) {
     this.debug = enabled;
-  }
-
-  /**
-   * Add change to history
-   * @private
-   */
-  _addToHistory(path, oldValue, newValue) {
-    this.history.push({
-      path,
-      oldValue,
-      newValue,
-      timestamp: Date.now()
-    });
-
-    if (this.history.length > this.maxHistory) {
-      this.history.shift();
-    }
   }
 
   /**

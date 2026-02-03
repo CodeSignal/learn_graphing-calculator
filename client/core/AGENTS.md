@@ -3,13 +3,13 @@ These modules are the plumbing; break them and the app thrashes. Keep changes
 minimal and documented.
 
 ## Files & roles
-1. `state-manager.js`: Central store with dot-path get/set, history (max 50),
-   optional debug logs. Manages runtime state: `parameters` (value/min/max/step,
+1. `state-manager.js`: Central store with dot-path get/set, optional debug logs.
+   Manages runtime state: `parameters` (value/min/max/step,
    derived from expressions), `functions` (from config), `graph` (from config).
    StateManager is a state store only; EventBus handles all notifications.
    StateManager imports EventBus to publish state change events.
 2. `event-bus.js`: Namespaced pub/sub (`module:action`), once subscriptions,
-   history (max 100), debug logging. Supports parent path bubbling for
+   debug logging. Supports parent path bubbling for
    `state:changed:*` events (subscribing to `state:changed:parameters` also
    receives notifications for `state:changed:parameters.m.value` and parent
    subscribers receive the current parent value). Supports
@@ -40,7 +40,6 @@ minimal and documented.
   needs StateManager for immediate callbacks and correct parent bubbling values).
 
 ## Safety/limits
-- History arrays are capped; if you change limits, ensure memory stays bounded.
 - `ConfigLoader.load` fetches relative to `./configs/config.json`; adjust only
   with clear reason and update root AGENTS.
 

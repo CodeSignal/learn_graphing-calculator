@@ -12,8 +12,8 @@ commands, or architecture.
    renderer), SidebarManager, ExpressionList, and the help modal
    (`design-system/components/modal`).
 3. **State & events**:
-   - Central store: `core/state-manager.js` (dot-path set/get, history,
-     validation). StateManager manages state only; EventBus handles all notifications.
+   - Central store: `core/state-manager.js` (dot-path set/get, validation).
+     StateManager manages state only; EventBus handles all notifications.
    - Pub/Sub: `core/event-bus.js` (namespaced events like `state:changed`,
      `expression:updated`). EventBus is the single notification mechanism for state changes.
      Supports parent path bubbling (subscribing to `state:changed:parameters` also receives
