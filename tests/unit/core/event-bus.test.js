@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
 import EventBus from '../../../client/core/event-bus.js';
+import StateManager from '../../../client/core/state-manager.js';
 
 function createStateManager(state) {
   return {
@@ -71,6 +72,40 @@ describe('EventBus parent path bubbling', () => {
     });
 
     expect(received).toHaveLength(0);
+  });
+});
+
+describe('Single canonical signal for function edits', () => {
+  beforeEach(() => {
+    EventBus.clear();
+    EventBus.setDebug(false);
+    EventBus.setStateManager(StateManager);
+    StateManager.initialize({ functions: [], graph: {} });
+  });
+
+  it('StateManager.set("functions", ...) fires state:changed:functions exactly once', () => {
+    const calls = [];
+    EventBus.subscribe('state:changed:functions', (data) => {
+      calls.push(data);
+    });
+
+    const funcs = [{ id: '1', expression: 'x^2' }];
+    StateManager.set('functions', funcs);
+
+    expect(calls).toHaveLength(1);
+    expect(calls[0].path).toBe('functions');
+    expect(calls[0].value).toBe(funcs);
+  });
+
+  it('no expression:updated event exists after cleanup', () => {
+    const calls = [];
+    EventBus.subscribe('expression:updated', (data) => {
+      calls.push(data);
+    });
+
+    StateManager.set('functions', [{ id: '1', expression: 'x+1' }]);
+
+    expect(calls).toHaveLength(0);
   });
 });
 

@@ -3,7 +3,7 @@ These modules are the plumbing; break them and the app thrashes. Keep changes
 minimal and documented.
 
 ## Files & roles
-1. `state-manager.js`: Central store with dot-path get/set, optional debug logs.
+1. `state-manager.js`: Central store with dot-path get/set/reset, optional debug logs.
    Manages runtime state: `parameters` (value/min/max/step,
    derived from expressions), `functions` (from config), `graph` (from config).
    StateManager is a state store only; EventBus handles all notifications.
@@ -22,17 +22,20 @@ minimal and documented.
    `{functions: [], graph: {xMin, xMax, yMin, yMax, showGrid, showAxes, showLegend}}`.
 
 ## Usage patterns
-- Prefer `StateManager.set(path, value, { silent: true })` only when you
-  manually publish the relevant event (e.g., `EventBus.publish('expression:updated', data)`)
-  to avoid render storms.
+- `state:changed:functions` is the canonical signal for any function/expression
+  change. ExpressionList calls `StateManager.set('functions', ...)` which fires
+  this event automatically. Do not publish a separate domain event for the same
+  edit.
+- Use `StateManager.set(path, value, { silent: true })` only when you manually
+  publish the relevant event (e.g., `EventBus.publish('parameters:updated', ...)`
+  for slider changes) to avoid render storms.
 - Config schema: `{functions: [], graph: {...}}`. Parameters are runtime state,
   not config.
 - `parameters` state is dynamically populated by GraphEngine from expression
   variables (e.g., `m`, `b` in `m*x + b`).
 - Use `StateManager.getControlValues()` to build evaluation scopes from
   parameters.
-- Keep event names consistent and scoped (`state:changed`, `parameters:updated`,
-  `expression:updated`).
+- Keep event names consistent and scoped (`state:changed`, `parameters:updated`).
 - **Dependency injection**: EventBus requires StateManager to be injected via
   `EventBus.setStateManager(StateManager)` during app initialization (after
   StateManager is initialized, before components subscribe with `immediate: true`).
@@ -44,7 +47,7 @@ minimal and documented.
   with clear reason and update root AGENTS.
 
 ## When adding features
-- New schema fields → extend `validate()` and `_applyDefaults()` methods.
+- New schema fields → extend `ConfigLoader._applyDefaults()`.
 - If you add schema fields, document them here and in root AGENTS.
 
 ## Documentation rule

@@ -27,11 +27,10 @@ styling is a last resort.
   subscribe with `{ immediate: true }` or rely on bubbled parent `state:changed:*` payloads.
 - GraphEngine listens to:
   - `state:changed` for viewport resets
-  - `expression:updated` for live expression edits
-  - `state:changed:functions` for add/remove/reorder (triggers parameter
-    detection)
+  - `state:changed:functions` for any expression change (typing, add/remove,
+    reorder) -- this is the canonical signal for function edits, triggers both
+    render and parameter detection
   - `parameters:updated` for slider-driven value changes
-- ExpressionList publishes `expression:updated` when inputs change.
 - GraphEngine detects parameters from graph lines (symbols beyond `x/y`) and:
   1. Ensures `parameters[paramName] = { value, min, max, step }`
   2. Auto-creates assignment expressions (e.g., `a = 1.0`) for missing params

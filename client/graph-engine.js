@@ -59,15 +59,6 @@ export default class GraphEngine {
             })
         );
 
-        // Listen for expression updates
-        this.unsubscribers.push(
-            EventBus.subscribe('expression:updated', () => {
-                this.requestRender();
-                // Trigger parameter detection (debounced)
-                this.scheduleParameterDetection();
-            })
-        );
-
         // Listen for parameter updates (sliders)
         this.unsubscribers.push(
             EventBus.subscribe('parameters:updated', () => {

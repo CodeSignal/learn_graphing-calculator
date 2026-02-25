@@ -788,7 +788,6 @@ export default class ExpressionList {
 
             functions[index] = nextFunc;
             StateManager.set('functions', functions);
-            EventBus.publish('expression:updated', functions);
 
             if (classification.kind === 'assignment' && classification.paramName) {
                 // ParameterSlider will handle parameter config updates

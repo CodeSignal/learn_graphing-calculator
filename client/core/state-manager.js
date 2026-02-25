@@ -166,22 +166,6 @@ class StateManagerClass {
   }
 
   /**
-   * Update multiple state values at once
-   * @param {Object} updates - Object with paths as keys and new values
-   * @param {Object} options - Optional configuration
-   */
-  update(updates, options = {}) {
-    Object.entries(updates).forEach(([path, value]) => {
-      this.set(path, value, { ...options, silent: true });
-    });
-
-    // Emit single update event
-    if (!options.silent) {
-      EventBus.publish('state:updated', updates);
-    }
-  }
-
-  /**
    * Reset state to initial values
    */
   reset() {
@@ -210,30 +194,6 @@ class StateManagerClass {
     this.debug = enabled;
   }
 
-  /**
-   * Validate state value (extensible)
-   * @param {string} path - State path
-   * @param {*} value - Value to validate
-   * @returns {boolean} Whether value is valid
-   */
-  validate(path, value) {
-    // Add validation logic as needed
-    // Parameters are runtime state with numeric values + metadata.
-    if (path.startsWith('parameters.')) {
-      if (typeof value === 'number') {
-        return true;
-      }
-
-      if (value && typeof value === 'object') {
-        if ('value' in value && typeof value.value !== 'number') return false;
-        if ('min' in value && typeof value.min !== 'number') return false;
-        if ('max' in value && typeof value.max !== 'number') return false;
-        if ('step' in value && typeof value.step !== 'number') return false;
-      }
-    }
-
-    return true;
-  }
 }
 
 // Create singleton instance

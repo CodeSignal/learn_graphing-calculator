@@ -127,20 +127,6 @@ class EventBusClass {
   }
 
   /**
-   * Unsubscribe all subscribers from an event
-   * @param {string} eventName - Name of the event
-   */
-  unsubscribeAll(eventName) {
-    if (this.subscribers.has(eventName)) {
-      this.subscribers.delete(eventName);
-
-      if (this.debug) {
-        console.log(`[EventBus] Unsubscribed all from '${eventName}'`);
-      }
-    }
-  }
-
-  /**
    * Publish an event to all subscribers
    * @param {string} eventName - Name of the event to publish
    * @param {*} data - Data to pass to subscribers
@@ -161,24 +147,6 @@ class EventBusClass {
 
     // Notify subscribers
     this._notifySubscribers(eventName, data);
-  }
-
-  /**
-   * Get list of all event names currently subscribed to
-   * @returns {string[]} Array of event names
-   */
-  getEventNames() {
-    return Array.from(this.subscribers.keys());
-  }
-
-  /**
-   * Get subscriber count for an event
-   * @param {string} eventName - Name of the event
-   * @returns {number} Number of subscribers
-   */
-  getSubscriberCount(eventName) {
-    const subscribers = this.subscribers.get(eventName);
-    return subscribers ? subscribers.length : 0;
   }
 
   /**

@@ -12,10 +12,10 @@ commands, or architecture.
    renderer), SidebarManager, ExpressionList, and the help modal
    (`design-system/components/modal`).
 3. **State & events**:
-   - Central store: `core/state-manager.js` (dot-path set/get, validation).
+   - Central store: `core/state-manager.js` (dot-path set/get).
      StateManager manages state only; EventBus handles all notifications.
    - Pub/Sub: `core/event-bus.js` (namespaced events like `state:changed`,
-     `expression:updated`). EventBus is the single notification mechanism for state changes.
+     `parameters:updated`). EventBus is the single notification mechanism for state changes.
      Supports parent path bubbling (subscribing to `state:changed:parameters` also receives
      notifications for `state:changed:parameters.m.value`), and bubbled parent events provide
      the parent value (not the child value). Use `{ immediate: true }` to receive current
@@ -35,8 +35,8 @@ commands, or architecture.
      points).
    - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX).
 5. **UI components**:
-   - `components/expression-list.js` manages expressions (live updates publish
-     `expression:updated`).
+   - `components/expression-list.js` manages expressions (updates go through
+     `StateManager.set('functions', ...)` which fires `state:changed:functions`).
    - `components/sidebar-manager.js` handles resize/toggle.
 6. **Config**:
    - Primary: `configs/config.json` (loaded first). Fallback:
