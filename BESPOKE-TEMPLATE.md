@@ -84,11 +84,6 @@ Every application should include these files in the following order:
       - content: your help content (string or loaded from file)
       - theme: `'auto'`
 
-2. STATUS MANAGEMENT:
-   a) Use the provided setStatus() function for status updates
-   b) Update status for: loading, saving, errors, user actions
-   c) Keep status messages concise and informative
-
 ## Error Handling Requirements
 
 1. WRAP all async operations in try-catch blocks
@@ -97,18 +92,6 @@ Every application should include these files in the following order:
 4. IMPLEMENT retry logic for network operations
 5. HANDLE localStorage quota exceeded errors
 6. VALIDATE data before saving operations
-
-## Status Message Conventions
-
-Use these EXACT status messages for consistency:
-
-- "Ready" - Application loaded successfully
-- "Loading..." - Data is being loaded
-- "Saving..." - Data is being saved
-- "Changes saved" - Auto-save completed successfully
-- "Save failed (will retry)" - Server save failed, will retry
-- "Failed to load data" - Data loading failed
-- "Auto-save initialized" - Auto-save system started
 
 ## File Naming Conventions
 
@@ -155,7 +138,6 @@ when the design system adds them.
 <div class="bespoke">
   <header class="header">
     <h1>My App</h1>
-    <div class="status">Ready</div>
     <button class="button button-text">Help</button>
   </header>
 
@@ -188,7 +170,6 @@ when the design system adds them.
 ```html
 <header class="header">
   <h1>App Title</h1>
-  <div class="status">Status message</div>
   <button class="button button-text">Help</button>
 </header>
 ```
@@ -394,7 +375,6 @@ between light and dark themes. No additional configuration is needed.
   <header class="header">
     <h1>DB Schema Designer</h1>
     <button id="btn-save" class="button button-primary">Save</button>
-    <div class="status">Ready</div>
     <button class="button button-text">Help</button>
   </header>
 

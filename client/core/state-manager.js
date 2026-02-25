@@ -11,7 +11,6 @@
  *   parameters: {},       // Runtime parameter values + slider metadata
  *   functions: [],        // Function expressions
  *   graph: {},           // Graph viewport and display settings
- *   status: 'ready'       // Application status
  * }
  *
  * Usage:
@@ -29,7 +28,6 @@ class StateManagerClass {
       config: null,
       parameters: {},
       functions: [],
-      status: 'initializing',
       errors: []
     };
 
@@ -42,7 +40,6 @@ class StateManagerClass {
    */
   initialize(config) {
     this.state.config = config;
-    this.state.status = 'ready';
 
     // Store graph config at top level for easy access
     if (config.graph) {
@@ -175,7 +172,6 @@ class StateManagerClass {
       config: null,
       parameters: {},
       functions: [],
-      status: 'ready',
       errors: []
     };
 

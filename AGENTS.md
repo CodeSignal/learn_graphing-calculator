@@ -83,13 +83,6 @@ commands, or architecture.
   classification fields (`kind`, `error`, `paramName`, `value`, `usedVariables`,
   `plotExpression`, `verticalLineX`) for UI consistency; GraphEngine still
   classifies from `expression` on each render.
-- **Status text**: Stick to these exact strings:
-  1. "Ready"
-  2. "Loading..."
-  3. "Saving..."
-  4. "Changes saved"
-  5. "Save failed (will retry)"
-  6. "Failed to load data"
 - **Error handling**: Wrap async; surface meaningful messages; log to console;
   never swallow errors that block rendering.
 - **Styling**: Keep line length ≤100 chars. Kebab-case filenames. No magic
@@ -118,7 +111,7 @@ commands, or architecture.
   Use Vitest; tests live under `tests/` (and may also exist under `client/`).
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
   add/edit expressions, confirm canvas redraws, sliders appear for parameters
-  (e.g., `a*sin(b*x)`), zoom/pan, help modal opens, status shows Ready.
+  (e.g., `a*sin(b*x)`), zoom/pan, help modal opens.
 - **Prod sanity**: `npm run build && npm run start:prod`, hit
   `http://localhost:3000`, ensure assets load from `dist/`.
 - When introducing risky math/engine changes, add/update automated tests to

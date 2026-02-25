@@ -45,9 +45,6 @@ class App {
     // Initialize Help Modal
     this.initHelp();
 
-    // Set Ready Status
-    this.setStatus('Ready');
-
     if (this.debug) {
       console.log('[App] Initialized');
     }
@@ -154,14 +151,6 @@ class App {
 
 
 
-
-  /**
-   * Update Status Bar
-   */
-  setStatus(msg) {
-    const el = document.getElementById('status');
-    if (el) el.textContent = msg;
-  }
 
   /**
    * Enable or disable debug mode
