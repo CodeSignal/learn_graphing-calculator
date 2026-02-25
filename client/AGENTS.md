@@ -39,6 +39,19 @@ styling is a last resort.
      lines
 - Assignment lines never plot; only graph lines render.
 
+## Components
+- `components/expression-list.js`: Manages the list of mathematical expressions
+  in the sidebar. Handles expression rendering, LaTeX display, input mode
+  switching, visibility toggling, deletion, reordering, and auto-conversion of
+  bare parameters to assignments. Delegates slider functionality to
+  ParameterSlider.
+- `components/parameter-slider.js`: Manages parameter slider UI for assignment
+  expressions (e.g., `a = 1.0`). Owns slider DOM structure, wraps
+  NumericSlider from design system, handles parameter config normalization,
+  value formatting, settings panel (min/max/step), and interaction tracking for
+  commit-boundary logging. Emits onChange callbacks with old/new values for
+  ExpressionList to handle expression updates and logging.
+
 ## Utilities
 - Line classification lives in `math/line-classifier.js` and is the single
   source of truth for line kinds.
@@ -61,8 +74,10 @@ styling is a last resort.
   - Auto-creates assignment expressions (e.g., `a = 1.0`) for parameters that
     don't already have assignments
   - Uses debouncing (300ms) to prevent rapid-fire updates during typing
-- ExpressionList renders sliders for assignment expressions and inline range
-  settings (min/max/step).
+- ExpressionList creates ParameterSlider instances for assignment expressions.
+  ParameterSlider manages the slider UI, settings panel, and parameter config
+  normalization. ExpressionList handles expression updates and logging based
+  on ParameterSlider's onChange callbacks.
 - When you add a new UI control, either predefine it in config or ensure
   GraphEngine's variable detection handles it without render loops.
 
@@ -75,9 +90,12 @@ styling is a last resort.
     graph updates), but logging occurs only on commit (`blur` event or Enter
     key). The component tracks `editStartExpression` when entering edit mode
     and compares old vs new on commit.
-  - **Slider edits**: For parameter sliders (assignment expressions like
-    `a = 1.0`), logging occurs once per interaction end (mouseup/touchend) or
-    for discrete changes (track click/keyboard). During drag, intermediate
+  - **Slider edits**: ParameterSlider tracks interaction state and emits
+    onChange callbacks with `{oldValue, newValue, isDiscrete, paramName}`.
+    ExpressionList receives these callbacks, formats values into expressions,
+    updates state, and logs the change. For drag interactions, ParameterSlider
+    captures the start value and emits once on drag end. For discrete changes
+    (track click/keyboard), it emits immediately. During drag, intermediate
     values update state but do not trigger logs.
 - Log messages:
   - Create: `Created expression ${id}`

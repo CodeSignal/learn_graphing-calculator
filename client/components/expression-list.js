@@ -5,7 +5,7 @@
 
 import StateManager from '../core/state-manager.js';
 import EventBus from '../core/event-bus.js';
-import NumericSlider from '../design-system/components/numeric-slider/numeric-slider.js';
+import ParameterSlider from './parameter-slider.js';
 import sharedParser from '../math/shared-parser.js';
 import { classifyLine } from '../math/line-classifier.js';
 import { DEFAULT_PARAMETER } from '../math/parameter-defaults.js';
@@ -18,7 +18,7 @@ export default class ExpressionList {
         this.container = document.getElementById(containerId);
         this.addButton = document.getElementById(addButtonId);
         this.boundRender = this.render.bind(this);
-        // id -> { element, slider, inputEl, latexEl, colorEl, errorEl, sliderContainer, ... }
+        // id -> { element, parameterSlider, inputEl, latexEl, colorEl, errorEl, sliderContainer, ... }
         this.renderedItems = new Map();
         this.unsubscribers = [];
         this.debug = false;
@@ -311,41 +311,6 @@ export default class ExpressionList {
             </div>
             <div class="expression-slider-container"
                 id="slider-container-${func.id}">
-                <div class="expression-slider-row">
-                    <div class="expression-slider" data-id="${func.id}"></div>
-                    <button class="button button-text button-small expression-slider-toggle"
-                        type="button"
-                        data-id="${func.id}"
-                        title="Slider settings"
-                        aria-label="Toggle slider settings">Range</button>
-                </div>
-                <div class="expression-slider-settings"
-                    data-id="${func.id}"
-                    hidden>
-                    <div class="expression-slider-settings-fields">
-                        <label class="expression-slider-setting">
-                            <span class="expression-slider-setting-label">Min</span>
-                            <input type="number"
-                                class="input expression-slider-setting-input"
-                                data-setting="min">
-                        </label>
-                        <label class="expression-slider-setting">
-                            <span class="expression-slider-setting-label">Max</span>
-                            <input type="number"
-                                class="input expression-slider-setting-input"
-                                data-setting="max">
-                        </label>
-                        <label class="expression-slider-setting">
-                            <span class="expression-slider-setting-label">Step</span>
-                            <input type="number"
-                                class="input expression-slider-setting-input"
-                                data-setting="step">
-                        </label>
-                    </div>
-                    <button class="button button-secondary button-small expression-slider-reset"
-                        type="button"
-                        data-id="${func.id}">Reset</button>
-                </div>
             </div>
         </div>
         <button class="button button-text button-medium"
@@ -363,13 +328,6 @@ export default class ExpressionList {
         const deleteBtn = item.querySelector('button[aria-label="Delete expression"]');
         const errorEl = item.querySelector('.expression-error');
         const sliderContainer = item.querySelector(`#slider-container-${func.id}`);
-        const sliderHost = item.querySelector('.expression-slider');
-        const settingsToggle = item.querySelector('.expression-slider-toggle');
-        const settingsPanel = item.querySelector('.expression-slider-settings');
-        const settingsInputs = settingsPanel
-            ? Array.from(settingsPanel.querySelectorAll('.expression-slider-setting-input'))
-            : [];
-        const settingsReset = item.querySelector('.expression-slider-reset');
 
         // Event Listeners
         input.addEventListener('input', (e) => {
@@ -411,32 +369,6 @@ export default class ExpressionList {
             this.deleteExpression(func.id);
         });
 
-        if (settingsToggle) {
-            settingsToggle.addEventListener('click', () => {
-                this.toggleSliderSettings(func.id);
-            });
-        }
-
-        if (settingsReset) {
-            settingsReset.addEventListener('click', () => {
-                this.resetSliderSettings(func.id);
-            });
-        }
-
-        if (settingsInputs.length > 0) {
-            const commitSettings = () => this.commitSliderSettings(func.id);
-            settingsInputs.forEach(inputEl => {
-                inputEl.addEventListener('change', commitSettings);
-                inputEl.addEventListener('blur', commitSettings);
-                inputEl.addEventListener('keydown', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        inputEl.blur();
-                    }
-                });
-            });
-        }
-
         // Store item data
         const itemData = {
             element: item,
@@ -445,15 +377,8 @@ export default class ExpressionList {
             colorEl: colorBtn,
             errorEl: errorEl,
             sliderContainer: sliderContainer,
-            sliderHost: sliderHost,
-            settingsToggle: settingsToggle,
-            settingsPanel: settingsPanel,
-            settingsInputs: settingsInputs,
-            settingsReset: settingsReset,
-            settingsOpen: false,
-            slider: null,
+            parameterSlider: null,
             lastColor: func.color,
-            paramName: null,
             isEditing: !func.expression || func.expression.trim() === '',
             lastExpression: func.expression,
             // Track expression at edit start for commit-boundary logging
@@ -527,14 +452,14 @@ export default class ExpressionList {
      * @returns {boolean} True if conversion happened (should return early)
      */
     handleAutoConversion(func, item, param) {
-        if (!param.isParameter || item.slider) return false;
+        if (!param.isParameter || item.parameterSlider) return false;
 
         const isInputFocused = item.inputEl && document.activeElement === item.inputEl;
         if (isInputFocused) return false;
 
         const paramName = param.paramName;
         const defaultVal = DEFAULT_PARAMETER.value;
-        const formatted = this.formatValue(defaultVal, DEFAULT_PARAMETER.step);
+        const formatted = this._formatValueForDisplay(defaultVal, DEFAULT_PARAMETER.step);
         const newExpr = `${paramName} = ${formatted}`;
 
         this.updateExpression(func.id, newExpr);
@@ -542,128 +467,53 @@ export default class ExpressionList {
     }
 
     /**
-     * Create slider for an assignment expression
-     * @param {Object} func - Function object
-     * @param {Object} item - Item data from renderedItems Map
-     * @param {string} paramName - Parameter name
-     * @param {number} value - Initial value
+     * Format value for display in expression (helper for auto-conversion)
+     * @param {number} value - Value to format
+     * @param {number} step - Step size
+     * @returns {string} Formatted value string
+     * @private
      */
-    createSliderForAssignment(func, item, paramName, value) {
-        // Initialize slider interaction tracking
-        item.sliderInteractionActive = false;
-        item.sliderEditStartExpr = null;
-
-        const paramConfig = this.setParameterConfig(
-            paramName,
-            { value },
-            { silent: true, expandRange: true }
-        );
-
-        const sliderTarget = item.sliderHost || item.sliderContainer;
-        if (!sliderTarget) return;
-
-        const slider = new NumericSlider(sliderTarget, {
-            type: 'single',
-            min: paramConfig.min,
-            max: paramConfig.max,
-            step: paramConfig.step,
-            value: paramConfig.value,
-            showInputs: false,
-            continuousUpdates: true,
-            onChange: (newValue) => {
-                const currentConfig = this.getParameterConfig(paramName);
-                const roundedValue = this.roundToStep(newValue, currentConfig.step);
-                const nextConfig = this.setParameterConfig(
-                    paramName,
-                    { value: roundedValue },
-                    { silent: true }
-                );
-                const formattedValue = this.formatValue(
-                    nextConfig.value,
-                    nextConfig.step
-                );
-
-                // Update Expression Text to match
-                const newExpr = `${paramName} = ${formattedValue}`;
-
-                // Track slider interaction for commit-boundary logging
-                const isDragging = slider.isDragging;
-
-                // Capture old expression BEFORE state update (for discrete changes)
-                let oldExprForDiscrete = null;
-                if (!isDragging && !item.sliderInteractionActive) {
-                    // Discrete change - capture old expression before update
-                    const functions = StateManager.get('functions') || [];
-                    const currentFunc = functions.find(f => f.id === func.id);
-                    oldExprForDiscrete = currentFunc
-                        ? currentFunc.expression
-                        : func.expression;
-                }
-
-                // Capture start expression when drag begins
-                if (isDragging && !item.sliderInteractionActive) {
-                    item.sliderInteractionActive = true;
-                    // Get current expression from state before update
-                    const functions = StateManager.get('functions') || [];
-                    const currentFunc = functions.find(f => f.id === func.id);
-                    item.sliderEditStartExpr = currentFunc
-                        ? currentFunc.expression
-                        : func.expression;
-                }
-
-                // Update local input value immediately for responsiveness
-                if (item.inputEl) item.inputEl.value = newExpr;
-
-                // Update State
-                this.updateExpression(func.id, newExpr);
-
-                // Publish event for graph
-                EventBus.publish('parameters:updated', {
-                    [paramName]: nextConfig.value
-                });
-
-                // Log user action on interaction end (drag end) or discrete change (non-drag)
-                if (!isDragging) {
-                    if (item.sliderInteractionActive) {
-                        // Drag ended - log once with start -> end
-                        const oldExpr = item.sliderEditStartExpr || func.expression;
-                        this.logModified(func.id, oldExpr, newExpr, { paramName });
-                        item.sliderInteractionActive = false;
-                        item.sliderEditStartExpr = null;
-                    } else if (oldExprForDiscrete !== null && oldExprForDiscrete !== newExpr) {
-                        // Discrete change (track click, keyboard) - log immediately
-                        this.logModified(func.id, oldExprForDiscrete, newExpr, { paramName });
-                    }
-                }
-                // While dragging (isDragging === true), do not log - wait for drag end
-            }
-        });
-
-        item.slider = slider;
-        item.paramName = paramName;
-
-        this.syncSliderSettingsInputs(item, paramConfig);
+    _formatValueForDisplay(value, step) {
+        const decimals = this._getStepDecimals(step);
+        const rounded = this._roundToStep(value, step);
+        if (decimals === 0) {
+            return `${Math.round(rounded)}`;
+        }
+        return rounded.toFixed(decimals);
     }
 
     /**
-     * Destroy slider for an expression item
-     * @param {Object} item - Item data from renderedItems Map
+     * Round value to nearest step (helper for auto-conversion)
+     * @param {number} value - Value to round
+     * @param {number} step - Step size
+     * @returns {number} Rounded value
+     * @private
      */
-    destroySlider(item) {
-        if (item.slider) {
-            item.slider.destroy();
-            item.slider = null;
-            item.paramName = null;
-            if (item.sliderHost) {
-                item.sliderHost.innerHTML = '';
-            }
+    _roundToStep(value, step) {
+        if (!Number.isFinite(step) || step <= 0) {
+            return value;
         }
+        const scaled = value / step;
+        return Math.round(scaled) * step;
+    }
 
-        if (item.settingsPanel) {
-            item.settingsPanel.hidden = true;
+    /**
+     * Get number of decimal places for step (helper for auto-conversion)
+     * @param {number} step - Step size
+     * @returns {number} Number of decimal places
+     * @private
+     */
+    _getStepDecimals(step) {
+        if (!Number.isFinite(step)) return 0;
+        const stepString = step.toString();
+        if (stepString.includes('e-')) {
+            const parts = stepString.split('e-');
+            return Number(parts[1]) || 0;
         }
-
-        item.settingsOpen = false;
+        if (stepString.includes('.')) {
+            return stepString.split('.')[1].length;
+        }
+        return 0;
     }
 
     /**
@@ -684,8 +534,9 @@ export default class ExpressionList {
             classification.paramName;
 
         if (!isAssignment) {
-            if (item.slider) {
-                this.destroySlider(item);
+            if (item.parameterSlider) {
+                item.parameterSlider.destroy();
+                item.parameterSlider = null;
             }
             if (item.sliderContainer) {
                 item.sliderContainer.style.display = 'none';
@@ -696,32 +547,84 @@ export default class ExpressionList {
         const paramName = classification.paramName;
         const value = classification.value;
 
-        if (!item.slider || item.paramName !== paramName) {
-            if (item.slider) {
-                this.destroySlider(item);
-            }
-            this.createSliderForAssignment(func, item, paramName, value);
+        // Create or update ParameterSlider
+        if (!item.parameterSlider) {
+            // Create new ParameterSlider instance
+            item.parameterSlider = new ParameterSlider(
+                item.sliderContainer,
+                paramName,
+                { value },
+                {
+                    onChange: ({ oldValue, newValue, isDiscrete, paramName: pName }) => {
+                        // Format values for expression display
+                        const paramConfig = StateManager.get(`parameters.${pName}`) || {};
+                        const step = paramConfig.step || DEFAULT_PARAMETER.step;
+                        const formatValue = (val) => {
+                            const decimals = this._getStepDecimals(step);
+                            const rounded = this._roundToStep(val, step);
+                            return decimals === 0 ? `${Math.round(rounded)}` : rounded.toFixed(decimals);
+                        };
+                        const oldExpr = `${pName} = ${formatValue(oldValue)}`;
+                        const newExpr = `${pName} = ${formatValue(newValue)}`;
+
+                        // Update expression in state
+                        this.updateExpression(func.id, newExpr);
+
+                        // Update local input value immediately for responsiveness
+                        if (item.inputEl) {
+                            item.inputEl.value = newExpr;
+                        }
+
+                        // Log user action
+                        this.logModified(func.id, oldExpr, newExpr, { paramName: pName });
+                    }
+                }
+            );
+        } else if (item.parameterSlider.paramName !== paramName) {
+            // Parameter name changed - destroy old and create new
+            item.parameterSlider.destroy();
+            item.parameterSlider = new ParameterSlider(
+                item.sliderContainer,
+                paramName,
+                { value },
+                {
+                    onChange: ({ oldValue, newValue, isDiscrete, paramName: pName }) => {
+                        // Format values for expression display
+                        const paramConfig = StateManager.get(`parameters.${pName}`) || {};
+                        const step = paramConfig.step || DEFAULT_PARAMETER.step;
+                        const formatValue = (val) => {
+                            const decimals = this._getStepDecimals(step);
+                            const rounded = this._roundToStep(val, step);
+                            return decimals === 0 ? `${Math.round(rounded)}` : rounded.toFixed(decimals);
+                        };
+                        const oldExpr = `${pName} = ${formatValue(oldValue)}`;
+                        const newExpr = `${pName} = ${formatValue(newValue)}`;
+
+                        // Update expression in state
+                        this.updateExpression(func.id, newExpr);
+
+                        // Update local input value immediately for responsiveness
+                        if (item.inputEl) {
+                            item.inputEl.value = newExpr;
+                        }
+
+                        // Log user action
+                        this.logModified(func.id, oldExpr, newExpr, { paramName: pName });
+                    }
+                }
+            );
         }
 
         if (item.sliderContainer) {
             item.sliderContainer.style.display = 'block';
         }
 
-        const paramConfig = this.getParameterConfig(paramName, value);
-
-        if (item.slider && !item.slider.isDragging) {
-            const needsRangeUpdate = item.slider.config.min !== paramConfig.min ||
-                item.slider.config.max !== paramConfig.max ||
-                item.slider.config.step !== paramConfig.step;
-
-            if (needsRangeUpdate) {
-                this.applySliderConfig(item, paramConfig);
-            } else if (item.slider.getValue() !== paramConfig.value) {
-                item.slider.setValue(paramConfig.value, null, false);
-            }
+        // Update slider if config changed externally
+        const paramConfig = StateManager.get(`parameters.${paramName}`) || {};
+        if (paramConfig.value === undefined) {
+            paramConfig.value = value;
         }
-
-        this.syncSliderSettingsInputs(item, paramConfig);
+        item.parameterSlider.updateConfig(paramConfig);
     }
 
     /**
@@ -732,10 +635,10 @@ export default class ExpressionList {
         const item = this.renderedItems.get(id);
         if (!item) return;
 
-        // Clean up slider
-        if (item.slider) {
-            item.slider.destroy();
-            item.slider = null;
+        // Clean up ParameterSlider
+        if (item.parameterSlider) {
+            item.parameterSlider.destroy();
+            item.parameterSlider = null;
         }
 
         // Remove from DOM
@@ -800,235 +703,16 @@ export default class ExpressionList {
         return div.innerHTML;
     }
 
-    roundToStep(value, step) {
-        if (!Number.isFinite(step) || step <= 0) {
-            return value;
-        }
-        const scaled = value / step;
-        return Math.round(scaled) * step;
-    }
-
-    getStepDecimals(step) {
-        if (!Number.isFinite(step)) return 0;
-        const stepString = step.toString();
-        if (stepString.includes('e-')) {
-            const parts = stepString.split('e-');
-            return Number(parts[1]) || 0;
-        }
-        if (stepString.includes('.')) {
-            return stepString.split('.')[1].length;
-        }
-        return 0;
-    }
-
-    formatValue(value, step) {
-        const decimals = this.getStepDecimals(step);
-        const rounded = this.roundToStep(value, step);
-        if (decimals === 0) {
-            return `${Math.round(rounded)}`;
-        }
-        return rounded.toFixed(decimals);
-    }
-
-    normalizeParameterConfig(config) {
-        const toNumber = (val, fallback) => (
-            Number.isFinite(val) ? Number(val) : fallback
-        );
-
-        const normalized = {
-            ...DEFAULT_PARAMETER,
-            ...config
-        };
-
-        normalized.min = toNumber(normalized.min, DEFAULT_PARAMETER.min);
-        normalized.max = toNumber(normalized.max, DEFAULT_PARAMETER.max);
-        normalized.step = toNumber(normalized.step, DEFAULT_PARAMETER.step);
-
-        if (normalized.step <= 0) {
-            normalized.step = DEFAULT_PARAMETER.step;
-        }
-
-        if (normalized.min > normalized.max) {
-            const swap = normalized.min;
-            normalized.min = normalized.max;
-            normalized.max = swap;
-        }
-
-        const rawValue = toNumber(normalized.value, DEFAULT_PARAMETER.value);
-        const clamped = Math.min(Math.max(rawValue, normalized.min), normalized.max);
-        normalized.value = this.roundToStep(clamped, normalized.step);
-
-        return normalized;
-    }
-
-    getParameterConfig(paramName, fallbackValue = null) {
-        const parameters = StateManager.get('parameters') || {};
-        const existing = parameters[paramName] || {};
-        const base = {
-            ...existing
-        };
-
-        if (Number.isFinite(fallbackValue)) {
-            base.value = fallbackValue;
-        }
-
-        return this.normalizeParameterConfig(base);
-    }
-
-    hasParameterChanged(current, next) {
-        if (!current) return true;
-        return current.value !== next.value ||
-            current.min !== next.min ||
-            current.max !== next.max ||
-            current.step !== next.step;
-    }
-
-    setParameterConfig(paramName, updates, options = {}) {
-        const parameters = StateManager.get('parameters') || {};
-        const existing = parameters[paramName] || {};
-        const expandRange = options.expandRange === true;
-        const draft = { ...existing, ...updates };
-
-        if (expandRange && Number.isFinite(draft.value)) {
-            if (!('min' in updates) && Number.isFinite(draft.min) && draft.value < draft.min) {
-                draft.min = draft.value;
-            }
-            if (!('max' in updates) && Number.isFinite(draft.max) && draft.value > draft.max) {
-                draft.max = draft.value;
-            }
-        }
-
-        const next = this.normalizeParameterConfig(draft);
-
-        if (this.hasParameterChanged(existing, next)) {
-            StateManager.set(`parameters.${paramName}`, next, options);
-        }
-
-        return next;
-    }
-
-    applySliderConfig(item, config) {
-        if (!item.slider) return;
-
-        item.slider.config.min = config.min;
-        item.slider.config.max = config.max;
-        item.slider.config.step = config.step;
-
-        if (item.slider.wrapper) {
-            item.slider.wrapper.setAttribute('aria-valuemin', config.min);
-            item.slider.wrapper.setAttribute('aria-valuemax', config.max);
-        }
-
-        item.slider.setValue(config.value, null, false);
-    }
-
-    syncSliderSettingsInputs(item, config) {
-        if (!item.settingsInputs || item.settingsInputs.length === 0) return;
-        item.settingsInputs.forEach(inputEl => {
-            const key = inputEl.dataset.setting;
-            if (key && config[key] !== undefined) {
-                inputEl.value = config[key];
-            }
-        });
-    }
-
-    toggleSliderSettings(id) {
-        const item = this.renderedItems.get(id);
-        if (!item || !item.settingsPanel) return;
-
-        item.settingsOpen = !item.settingsOpen;
-        item.settingsPanel.hidden = !item.settingsOpen;
-        if (item.settingsToggle) {
-            item.settingsToggle.classList.toggle('is-open', item.settingsOpen);
-        }
-    }
-
-    commitSliderSettings(id) {
-        const item = this.renderedItems.get(id);
-        if (!item || !item.paramName) return;
-
-        const current = this.getParameterConfig(item.paramName);
-        const updates = {};
-
-        item.settingsInputs.forEach(inputEl => {
-            const key = inputEl.dataset.setting;
-            const value = Number.parseFloat(inputEl.value);
-            if (key && Number.isFinite(value)) {
-                updates[key] = value;
-            }
-        });
-
-        const next = this.setParameterConfig(item.paramName, updates);
-
-        if (item.slider && !item.slider.isDragging) {
-            this.applySliderConfig(item, next);
-        }
-
-        this.syncSliderSettingsInputs(item, next);
-
-        if (next.value !== current.value) {
-            const formatted = this.formatValue(next.value, next.step);
-            this.updateExpression(id, `${item.paramName} = ${formatted}`);
-            EventBus.publish('parameters:updated', {
-                [item.paramName]: next.value
-            });
-        }
-    }
-
-    resetSliderSettings(id) {
-        const item = this.renderedItems.get(id);
-        if (!item || !item.paramName) return;
-
-        const current = this.getParameterConfig(item.paramName);
-        const updates = {
-            min: DEFAULT_PARAMETER.min,
-            max: DEFAULT_PARAMETER.max,
-            step: DEFAULT_PARAMETER.step
-        };
-
-        const next = this.setParameterConfig(item.paramName, updates);
-
-        if (item.slider && !item.slider.isDragging) {
-            this.applySliderConfig(item, next);
-        }
-
-        this.syncSliderSettingsInputs(item, next);
-
-        if (next.value !== current.value) {
-            const formatted = this.formatValue(next.value, next.step);
-            this.updateExpression(id, `${item.paramName} = ${formatted}`);
-            EventBus.publish('parameters:updated', {
-                [item.paramName]: next.value
-            });
-        }
-    }
-
     updateSlidersFromState() {
         // Update sliders if parameters changed externally (e.g. assignment edits)
         const parameters = StateManager.get('parameters') || {};
         this.renderedItems.forEach(item => {
-            if (!item.slider || !item.paramName) return;
-            const paramConfig = parameters[item.paramName];
+            if (!item.parameterSlider) return;
+            const paramName = item.parameterSlider.paramName;
+            const paramConfig = parameters[paramName];
             if (!paramConfig) return;
 
-            const normalized = this.normalizeParameterConfig(paramConfig);
-
-            if (!item.slider.isDragging) {
-                const needsRangeUpdate = item.slider.config.min !== normalized.min ||
-                    item.slider.config.max !== normalized.max ||
-                    item.slider.config.step !== normalized.step;
-
-                if (needsRangeUpdate) {
-                    this.applySliderConfig(item, normalized);
-                } else {
-                    const currentValue = item.slider.getValue();
-                    if (currentValue !== normalized.value) {
-                        item.slider.setValue(normalized.value, null, false);
-                    }
-                }
-            }
-
-            this.syncSliderSettingsInputs(item, normalized);
+            item.parameterSlider.updateConfig(paramConfig);
         });
     }
 
@@ -1107,13 +791,10 @@ export default class ExpressionList {
             EventBus.publish('expression:updated', functions);
 
             if (classification.kind === 'assignment' && classification.paramName) {
-                const nextConfig = this.setParameterConfig(
-                    classification.paramName,
-                    { value: classification.value },
-                    { merge: true, expandRange: true }
-                );
+                // ParameterSlider will handle parameter config updates
+                // Just publish the update event
                 EventBus.publish('parameters:updated', {
-                    [classification.paramName]: nextConfig.value
+                    [classification.paramName]: classification.value
                 });
             }
         }
@@ -1177,10 +858,10 @@ export default class ExpressionList {
         this.unsubscribers.forEach(unsub => unsub());
         this.unsubscribers = [];
 
-        // Clean up rendered items (sliders, DOM elements)
+        // Clean up rendered items (ParameterSliders, DOM elements)
         this.renderedItems.forEach(item => {
-            if (item.slider) {
-                item.slider.destroy();
+            if (item.parameterSlider) {
+                item.parameterSlider.destroy();
             }
         });
         this.renderedItems.clear();
