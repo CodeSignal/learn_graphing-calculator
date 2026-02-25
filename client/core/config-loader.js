@@ -7,7 +7,7 @@
  * Config structure:
  * {
  *   functions: [{id: string, expression: string, editable?: boolean, visible?: boolean}],
- *   graph: {xMin: number, xMax: number, yMin: number, yMax: number, showGrid: boolean, showAxes: boolean, showLegend: boolean}
+ *   graph: {xMin: number, xMax: number, yMin: number, yMax: number, showGrid: boolean, showAxes: boolean}
  * }
  *
  * Usage:
@@ -133,7 +133,7 @@ class ConfigLoaderClass {
         }
       }
 
-      const booleanGraphFields = ['showGrid', 'showAxes', 'showLegend'];
+      const booleanGraphFields = ['showGrid', 'showAxes'];
       for (const field of booleanGraphFields) {
         if (config.graph[field] !== undefined && typeof config.graph[field] !== 'boolean') {
           throw new Error(`Config.graph.${field} must be a boolean`);
@@ -154,8 +154,7 @@ class ConfigLoaderClass {
       graph: {
         ...DEFAULT_VIEWPORT_BOUNDS,
         showGrid: true,
-        showAxes: true,
-        showLegend: true
+        showAxes: true
       }
     };
 

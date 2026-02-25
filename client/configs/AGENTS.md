@@ -27,7 +27,7 @@ The loading happens in `client/app.js` → `initState()` → `ConfigLoader` → 
 - **Role**: Primary configuration file loaded at application startup
 - **Usage**: Actively loaded by `app.js` via `ConfigLoader.load('./configs/config.json')`
 - **Purpose**: Defines runtime state (viewport bounds, initial expressions, display settings)
-- **Schema**: `{functions: [{id, expression, visible?}], graph: {xMin, xMax, yMin, yMax, showGrid?, showAxes?, showLegend?}}`
+- **Schema**: `{functions: [{id, expression, visible?}], graph: {xMin, xMax, yMin, yMax, showGrid?, showAxes?}}`
 
 ### 2. `client/configs/default-config.js` (Fallback Config)
 - **Role**: Fallback configuration when `config.json` is unavailable or fails to load

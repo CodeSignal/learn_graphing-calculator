@@ -19,7 +19,7 @@ minimal and documented.
    This avoids circular dependencies while maintaining explicit coupling.
 3. `config-loader.js`: Validates and normalizes config objects or fetched JSON;
    applies defaults, auto-assigns ids/colors. Schema:
-   `{functions: [], graph: {xMin, xMax, yMin, yMax, showGrid, showAxes, showLegend}}`.
+   `{functions: [], graph: {xMin, xMax, yMin, yMax, showGrid, showAxes}}`.
 
 ## Usage patterns
 - `state:changed:functions` is the canonical signal for any function/expression

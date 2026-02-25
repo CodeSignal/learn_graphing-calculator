@@ -9,8 +9,7 @@ export default {
     yMin: -10,
     yMax: 10,
     showGrid: true,
-    showAxes: true,
-    showLegend: true
+    showAxes: true
   },
 
   // Initial expressions
