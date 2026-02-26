@@ -165,7 +165,7 @@ export default class ExpressionParser {
 
       return parsed;
     } catch (error) {
-      console.error(`[ExpressionParser] Parse error for "${expression}":`, error);
+      console.warn(`[ExpressionParser] Parse error for "${expression}":`, error);
 
       return {
         expression,

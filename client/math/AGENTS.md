@@ -13,36 +13,45 @@ alter math behavior.
 2. `shared-parser.js`: Singleton ExpressionParser instance so caching is shared
    across components.
 3. `line-classifier.js`: Single source of truth for line kinds (`graph`,
-   `assignment`, `invalid`, `empty`). Uses `parseAssignmentSyntax()` for syntax
-   detection, then applies semantic rules:
-   - `y = constant` → `graph` (horizontal line)
-   - `x = constant` → `graph` (vertical line, `plotExpression` set to
-     `VERTICAL_LINE_MARKER`, `verticalLineX` contains x-value)
-   - `param = constant` → `assignment` (parameter definition)
+   `assignment`, `invalid`, `empty`). Returns `graphMode` for function-plot:
+   `explicit`, `implicit`, or `inequality` (rendering deferred). Rules:
+   - `y = expr` → `graph`, `graphMode: 'explicit'`
+   - `x = expr` → `graph`, `graphMode: 'implicit'`, `plotExpression: 'x - (expr)'`
+     (supports constants, parameters, and y-dependent expressions; rejects if x in RHS)
+   - `expr = expr` (both sides non-simple) → `graph`, `graphMode: 'implicit'`
+   - Bare `f(x,y)` (both vars) → `graph`, `graphMode: 'implicit'`
+   - `>=`, `<=`, `>`, `<` → `graph`, `graphMode: 'inequality'` (deferred)
+   - `param = constant` → `assignment`
 4. `parameter-utils.js`: Derives defined/used parameters and missing assignments
    from classified lines.
 5. `parameter-defaults.js`: Default slider metadata `{ value, min, max, step }`.
-6. `function-evaluator.js`: Evaluates expressions at specific points. Supports
-   multivariate scopes. Used by GraphEngine for pixel-by-pixel rendering.
+6. `expression-adapter.js`: AST-based conversion layer with two public
+   functions:
+   - `toFunctionPlotSyntax(expression)`: Normalizes aliases for function-plot
+     (`pi/PI -> PI`, `e/E -> E`, `ln -> log`) without mutating raw input.
+   - `toDisplayLatex(expression)`: Converts raw expression text into polished
+     LaTeX (`pi/PI -> \\pi`, `ln -> \\ln`) and handles top-level relations.
 7. `utils/math-formatter.js`: Converts expressions to LaTeX and back; renders
-   with KaTeX.
+   with KaTeX. `toLatex()` delegates to `expression-adapter.js`.
 
 ## Expectations & constraints
 - **Syntax vs. Semantics separation**: `parseAssignmentSyntax()` handles pure
   syntax detection; `classifyLine()` applies semantic rules. This separation
   enables consistent handling of all assignment types (`x =`, `y =`, `param =`).
 - LineClassifier enforces graph semantics: graph lines require `x` unless
-  written as `y = ...` or `x = ...` (vertical line).
+  written as `y = ...`, `x = ...`, or implicit (both x and y).
 - Assignment lines must be constant expressions (`a = 1`, `b = pi`); variable-
   dependent RHS is invalid.
-- Vertical lines (`x = constant`) are classified as `graph` with special
-  `plotExpression` marker and `verticalLineX` value for rendering.
+- Maintain strict separation of expression targets:
+  - Raw text: editor/state (preserved exactly as typed)
+  - Plot text: `toFunctionPlotSyntax()`
+  - Display LaTeX: `toDisplayLatex()`
 - Keep parsing/evaluation through these modules—no `eval` or new Function.
 - Cache sizes are small; altering them? Document memory impact here.
 
 ## Performance & accuracy
-- Avoid heavy synchronous work inside render paths. GraphEngine renders
-  pixel-by-pixel using `evaluateAt()`.
+- Avoid heavy synchronous work inside render paths. GraphEngine classifies each
+  visible expression during redraw, so keep parser/classifier operations cheap.
 
 ## Testing
 - Unit tests:
@@ -51,6 +60,10 @@ alter math behavior.
   - `tests/unit/math/parameter-utils.test.js` covers parameter inference rules.
 - Run with `npm run test` or `npm run test:run`.
 - When modifying math behavior, update/add tests to maintain coverage.
+
+## Known limitations
+- **Inequality rendering deferred**: Detection is in place; no visual output yet.
+- **Parametric expressions**: Not yet supported (`x(t)`, `y(t)`); architecture ready.
 
 ## Documentation rule
 - Any math-layer change (API, defaults, precision, supported syntax) must be

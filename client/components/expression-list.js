@@ -120,8 +120,7 @@ export default class ExpressionList {
             usedVariables: Array.isArray(classification.usedVariables)
                 ? classification.usedVariables
                 : [],
-            plotExpression: classification.plotExpression ?? null,
-            verticalLineX: classification.verticalLineX ?? null
+            plotExpression: classification.plotExpression ?? null
         };
     }
 
@@ -129,10 +128,12 @@ export default class ExpressionList {
         if (!functions) return;
 
         const updated = functions.map(func => {
-            return {
-                ...func,
-                ...this.getClassificationMetadata(func.expression)
-            };
+            const meta = this.getClassificationMetadata(func.expression);
+            const item = this.renderedItems.get(func.id);
+            if (item?.isEditing && meta.error === 'Syntax error') {
+                meta.error = null;
+            }
+            return { ...func, ...meta };
         });
 
         const needsUpdate = updated.some((nextFunc, idx) => {
@@ -152,7 +153,6 @@ export default class ExpressionList {
                 prev.paramName !== nextFunc.paramName ||
                 prev.value !== nextFunc.value ||
                 prev.plotExpression !== nextFunc.plotExpression ||
-                prev.verticalLineX !== nextFunc.verticalLineX ||
                 !varsMatch;
         });
 
@@ -341,7 +341,9 @@ export default class ExpressionList {
         input.addEventListener('blur', () => {
             this.handleExpressionCommit(func.id);
             this.switchToLatexDisplay(func.id);
-            // Check for auto-conversion after blur (input no longer focused)
+            // Re-classify with isEditing=false to surface suppressed errors
+            this.handleFunctionsUpdate(StateManager.get('functions'));
+            // Check for auto-conversion after blur
             const functions = StateManager.get('functions') || [];
             const currentFunc = functions.find(f => f.id === func.id);
             const item = this.renderedItems.get(func.id);
@@ -727,15 +729,17 @@ export default class ExpressionList {
         const oldExpression = item.editStartExpression || '';
         const functions = StateManager.get('functions') || [];
         const currentFunc = functions.find(func => func.id === id);
-        const newExpression = currentFunc ? currentFunc.expression : item.inputEl.value || '';
-        const error = currentFunc ? currentFunc.error : null;
+        const newExpression = currentFunc
+            ? currentFunc.expression
+            : item.inputEl.value || '';
 
-        // Only log if expression actually changed
+        const meta = this.getClassificationMetadata(newExpression);
+
         if (oldExpression.trim() !== newExpression.trim()) {
-            this.logModified(id, oldExpression, newExpression, { error });
+            this.logModified(id, oldExpression, newExpression, { error: meta.error });
         }
 
-        // Clear edit start expression after logging
+        EventBus.publish('expressions:committed', { id });
         item.editStartExpression = undefined;
     }
 
@@ -777,25 +781,13 @@ export default class ExpressionList {
     updateExpression(id, newExpression) {
         const functions = [...StateManager.get('functions')];
         const index = functions.findIndex(f => f.id === id);
-
         if (index !== -1) {
-            const classification = classifyLine(newExpression, this.parser);
-            const nextFunc = {
+            functions[index] = {
                 ...functions[index],
                 expression: newExpression,
-                ...this.getClassificationMetadata(newExpression, classification)
+                ...this.getClassificationMetadata(newExpression)
             };
-
-            functions[index] = nextFunc;
             StateManager.set('functions', functions);
-
-            if (classification.kind === 'assignment' && classification.paramName) {
-                // ParameterSlider will handle parameter config updates
-                // Just publish the update event
-                EventBus.publish('parameters:updated', {
-                    [classification.paramName]: classification.value
-                });
-            }
         }
     }
 

@@ -5,6 +5,7 @@
 
 import katex from 'katex';
 import sharedParser from '../math/shared-parser.js';
+import { toDisplayLatex } from '../math/expression-adapter.js';
 
 /**
  * Converts a math.js expression to LaTeX syntax
@@ -16,39 +17,7 @@ export function toLatex(expression) {
     return '';
   }
 
-  let latex = expression;
-
-  // Replace common functions
-  latex = latex.replace(/sqrt\(([^)]+)\)/g, '\\sqrt{$1}');
-  latex = latex.replace(/abs\(([^)]+)\)/g, '|$1|');
-  latex = latex.replace(/log\(([^)]+)\)/g, '\\log($1)');
-  latex = latex.replace(/ln\(([^)]+)\)/g, '\\ln($1)');
-
-  // Trigonometric functions
-  latex = latex.replace(/sin\(([^)]+)\)/g, '\\sin($1)');
-  latex = latex.replace(/cos\(([^)]+)\)/g, '\\cos($1)');
-  latex = latex.replace(/tan\(([^)]+)\)/g, '\\tan($1)');
-  latex = latex.replace(/sec\(([^)]+)\)/g, '\\sec($1)');
-  latex = latex.replace(/csc\(([^)]+)\)/g, '\\csc($1)');
-  latex = latex.replace(/cot\(([^)]+)\)/g, '\\cot($1)');
-
-  // Inverse trigonometric functions
-  latex = latex.replace(/asin\(([^)]+)\)/g, '\\arcsin($1)');
-  latex = latex.replace(/acos\(([^)]+)\)/g, '\\arccos($1)');
-  latex = latex.replace(/atan\(([^)]+)\)/g, '\\arctan($1)');
-
-  // Replace multiplication (be careful to preserve function calls)
-  // Only replace * when it's between variables/numbers, not in function names
-  latex = latex.replace(/(\w+|\))(\s*)\*(\s*)(\w+|\()/g, '$1$2 \\cdot $3$4');
-
-  // Replace division with fractions for simple cases
-  // For now, keep division as-is to avoid complexity with nested operations
-  latex = latex.replace(/\//g, ' / ');
-
-  // Clean up any double spaces
-  latex = latex.replace(/\s+/g, ' ').trim();
-
-  return latex;
+  return toDisplayLatex(expression);
 }
 
 /**

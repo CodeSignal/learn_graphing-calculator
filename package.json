@@ -24,6 +24,7 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
+    "function-plot": "1.24.4",
     "katex": "^0.16.11",
     "mathjs": "^12.4.1",
     "ws": "^8.14.2"

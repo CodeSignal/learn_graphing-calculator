@@ -4,7 +4,7 @@ change behavior here, update this file. Use the design-system first; custom
 styling is a last resort.
 
 ## Layout & entry points
-1. `index.html`: Declares the DS styles, base layout (header, sidebar, canvas
+1. `index.html`: Declares the DS styles, base layout (header, sidebar, graph
    area), and loads `app.js`. Keep placeholders minimal; app-specific changes
    belong in JS/CSS, not duplicated HTML.
 2. `app.js`: Bootstraps StateManager, GraphEngine, sidebar components, help
@@ -12,7 +12,8 @@ styling is a last resort.
    parallel apps.
 3. CSS:
    - `app.css`: base layout, utilities, and custom overrides. Uses design system
-     tokens and variables.
+     tokens and variables. Keeps only one function-plot override: legend hidden
+     (sidebar is our legend; no native option).
 
 ## Design System usage
 - Use components from `design-system/components/*` (buttons, modal,
@@ -28,8 +29,11 @@ styling is a last resort.
 - GraphEngine listens to:
   - `state:changed` for viewport resets
   - `state:changed:functions` for any expression change (typing, add/remove,
-    reorder) -- this is the canonical signal for function edits, triggers both
-    render and parameter detection
+    reorder) -- this is the canonical signal for function edits and always
+    triggers render; parameter detection is skipped while an expression input is
+    focused
+  - `expressions:committed` for commit-boundary parameter detection after
+    typing (blur/Enter)
   - `parameters:updated` for slider-driven value changes
 - GraphEngine detects parameters from graph lines (symbols beyond `x/y`) and:
   1. Ensures `parameters[paramName] = { value, min, max, step }`
@@ -42,7 +46,8 @@ styling is a last resort.
 - `components/expression-list.js`: Manages the list of mathematical expressions
   in the sidebar. Handles expression rendering, LaTeX display, input mode
   switching, visibility toggling, deletion, reordering, and auto-conversion of
-  bare parameters to assignments. Delegates slider functionality to
+  bare parameters to assignments. Publishes `expressions:committed` at text
+  commit boundaries (blur/Enter). Delegates slider functionality to
   ParameterSlider.
 - `components/parameter-slider.js`: Manages parameter slider UI for assignment
   expressions (e.g., `a = 1.0`). Owns slider DOM structure, wraps
@@ -50,15 +55,32 @@ styling is a last resort.
   value formatting, settings panel (min/max/step), and interaction tracking for
   commit-boundary logging. Emits onChange callbacks with old/new values for
   ExpressionList to handle expression updates and logging.
+- `renderers/function-plot-renderer.js`: Adapter over `function-plot` that owns
+  chart init/rebuild/draw and forwards zoom events. Uses function-plot native
+  axis ticks/labels, grid via options, and on-curve tip (crosshairs + tooltip).
+- GraphEngine enforces equal unit scale on X/Y during render by deriving an
+  aspect-locked viewport from the canonical state viewport and current canvas
+  size. Policy is fixed to expanding the smaller axis around center (never
+  cropping). The canonical viewport in state is not mutated by resize-time
+  aspect correction.
 
 ## Utilities
 - Line classification lives in `math/line-classifier.js` and is the single
   source of truth for line kinds.
 - `state.functions` entries may include derived classification metadata
-  (`kind`, `error`, `paramName`, `value`, `usedVariables`, `plotExpression`,
-  `verticalLineX`) normalized by ExpressionList.
+  (`kind`, `graphMode`, `error`, `paramName`, `value`, `usedVariables`,
+  `plotExpression`) normalized by ExpressionList.
+- **Single-authority classification**: ExpressionList's `handleFunctionsUpdate`
+  is the single authority for classification metadata and UI-specific overrides.
+  It classifies all expressions on each `state:changed:functions` event and
+  suppresses syntax errors for items where `isEditing === true` (hides partial
+  expression errors while typing; surfaces them on blur). `updateExpression`
+  writes honest metadata; suppression happens only in `handleFunctionsUpdate`.
 - `math/shared-parser.js` provides a shared ExpressionParser instance for
   caching across components.
+- `math/expression-adapter.js` is the single expression adaptation layer:
+  `toFunctionPlotSyntax()` normalizes plot expressions for function-plot,
+  `toDisplayLatex()` converts raw user input into polished LaTeX for display.
 - ExpressionList still uses `ExpressionParser.isParameter()` for optional
   auto-conversion of bare params.
 
@@ -72,7 +94,8 @@ styling is a last resort.
   - Ensures `parameters` entries for new parameters (value/min/max/step)
   - Auto-creates assignment expressions (e.g., `a = 1.0`) for parameters that
     don't already have assignments
-  - Uses debouncing (300ms) to prevent rapid-fire updates during typing
+  - Uses debouncing (300ms), but defers detection while a text expression input
+    is focused and runs it on `expressions:committed`
 - ExpressionList creates ParameterSlider instances for assignment expressions.
   ParameterSlider manages the slider UI, settings panel, and parameter config
   normalization. ExpressionList handles expression updates and logging based
@@ -112,11 +135,14 @@ styling is a last resort.
 - Prod: `npm run build` then `npm run start:prod`.
 
 ## Gotchas
-- LineClassifier enforces `x` for graph lines; `y = ...` is allowed, `y`
-  elsewhere is invalid.
+- LineClassifier auto-detects expression type: explicit (`y = f(x)`, bare `f(x)`),
+  implicit (`x^2 + y^2 = 1`, `x = expr`), inequality (detected, rendering
+  deferred). Users type math; fnType is internal.
+- Keep raw expression text in inputs/state. Plot and LaTeX display conversions
+  are target-specific and handled by `math/expression-adapter.js`.
 - Assignment lines must be constants (no `x` on the RHS).
-- Canvas sizing depends on parent flex; avoid inline styles that break 100%
-  width/height.
+- Plot container sizing depends on parent flex; avoid inline styles that break
+  100% width/height.
 - Sidebar resizing uses mouse events; keep resizer element present and avoid CSS
   that removes its hit area.
 

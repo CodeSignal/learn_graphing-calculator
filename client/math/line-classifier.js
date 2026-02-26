@@ -10,19 +10,18 @@ const ERROR_MESSAGES = {
   syntax: 'Syntax error'
 };
 
-// Special marker for vertical lines (x = constant)
-export const VERTICAL_LINE_MARKER = '__VERTICAL__';
+const INEQUALITY_OPERATORS = ['>=', '<=', '>', '<'];
 
 const cloneResult = (result) => ({
   kind: result.kind,
+  graphMode: result.graphMode ?? null,
   paramName: result.paramName ?? null,
   value: result.value ?? null,
   error: result.error ?? null,
   usedVariables: Array.isArray(result.usedVariables)
     ? [...result.usedVariables]
     : [],
-  plotExpression: result.plotExpression ?? null,
-  verticalLineX: result.verticalLineX ?? null
+  plotExpression: result.plotExpression ?? null
 });
 
 const cacheResult = (key, result) => {
@@ -46,6 +45,16 @@ const buildVariableList = (usedSymbols) => {
   return Array.from(variables);
 };
 
+const buildImplicitVariableList = (usedSymbols) => {
+  const variables = new Set(['x', 'y']);
+  usedSymbols.forEach(symbol => {
+    if (symbol !== 'x' && symbol !== 'y') {
+      variables.add(symbol);
+    }
+  });
+  return Array.from(variables);
+};
+
 const mapParseError = (errorMessage) => {
   if (!errorMessage) return ERROR_MESSAGES.syntax;
   const normalized = errorMessage.toLowerCase();
@@ -61,30 +70,82 @@ const evaluateRHS = (rhsExpression, parser) => {
   }
 
   try {
-    // Use math.js directly to parse and evaluate without requiring variables
-    // This allows us to evaluate constants like "5", "pi", "1 + 2" without needing x
     const node = math.parse(rhsExpression);
     const compiled = node.compile();
-
-    // Try to evaluate without any variables
     const value = compiled.evaluate({});
     if (isFinite(value) && !isNaN(value)) {
       return { isValid: true, value };
     }
-
     return { isValid: false, value: null };
   } catch (error) {
-    // Evaluation failed (e.g., contains variables like x, y)
     return { isValid: false, value: null };
   }
+};
+
+const detectInequalityOperator = (str) => {
+  const trimmed = str.trim();
+  for (const op of INEQUALITY_OPERATORS) {
+    const idx = trimmed.indexOf(op);
+    if (idx >= 0) {
+      return { op, idx };
+    }
+  }
+  return null;
+};
+
+const tryParseImplicitEquation = (trimmed, parser) => {
+  const eqIdx = trimmed.indexOf('=');
+  if (eqIdx <= 0 || eqIdx >= trimmed.length - 1) return null;
+
+  const lhs = trimmed.slice(0, eqIdx).trim();
+  const rhs = trimmed.slice(eqIdx + 1).trim();
+  if (!lhs || !rhs) return null;
+
+  const lhsVars = parser.getAllSymbols(lhs);
+  const rhsVars = parser.getAllSymbols(rhs);
+  const vars = [...new Set([...lhsVars, ...rhsVars])];
+
+  const parsedLhs = parser.parse(lhs, buildImplicitVariableList(vars));
+  const parsedRhs = parser.parse(rhs, buildImplicitVariableList(vars));
+  if (!parsedLhs.isValid || !parsedRhs.isValid) return null;
+
+  const hasX = vars.includes('x');
+  const hasY = vars.includes('y');
+  if (!hasX && !hasY) return null;
+
+  return {
+    plotExpression: `(${lhs}) - (${rhs})`,
+    usedVariables: vars
+  };
 };
 
 const classifyGraphExpression = (expression, parser) => {
   const usedVariables = parser.getAllSymbols(expression);
 
-  if (usedVariables.includes('y')) {
+  if (usedVariables.includes('x') && usedVariables.includes('y')) {
+    const parsed = parser.parse(expression, buildImplicitVariableList(usedVariables));
+    if (!parsed.isValid) {
+      return {
+        kind: 'invalid',
+        graphMode: null,
+        error: mapParseError(parsed.error),
+        usedVariables,
+        plotExpression: null
+      };
+    }
+    return {
+      kind: 'graph',
+      graphMode: 'implicit',
+      error: null,
+      usedVariables,
+      plotExpression: expression
+    };
+  }
+
+  if (usedVariables.includes('y') && !usedVariables.includes('x')) {
     return {
       kind: 'invalid',
+      graphMode: null,
       error: 'y must be on the LHS',
       usedVariables,
       plotExpression: null
@@ -95,6 +156,7 @@ const classifyGraphExpression = (expression, parser) => {
   if (!parsed.isValid) {
     return {
       kind: 'invalid',
+      graphMode: null,
       error: mapParseError(parsed.error),
       usedVariables,
       plotExpression: null
@@ -104,6 +166,7 @@ const classifyGraphExpression = (expression, parser) => {
   if (!usedVariables.includes('x')) {
     return {
       kind: 'invalid',
+      graphMode: null,
       error: ERROR_MESSAGES.missingX,
       usedVariables,
       plotExpression: null
@@ -112,6 +175,7 @@ const classifyGraphExpression = (expression, parser) => {
 
   return {
     kind: 'graph',
+    graphMode: 'explicit',
     error: null,
     usedVariables,
     plotExpression: expression
@@ -125,6 +189,7 @@ export const classifyLine = (expression, parser) => {
   if (!trimmed) {
     return {
       kind: 'empty',
+      graphMode: null,
       error: ERROR_MESSAGES.empty,
       usedVariables: [],
       plotExpression: null
@@ -138,39 +203,46 @@ export const classifyLine = (expression, parser) => {
 
   let result;
 
-  // Check for assignment syntax first (using pure syntax detection)
+  const inequalityOp = detectInequalityOperator(trimmed);
+  if (inequalityOp) {
+    result = {
+      kind: 'graph',
+      graphMode: 'inequality',
+      error: null,
+      usedVariables: [],
+      plotExpression: null
+    };
+    cacheResult(cacheKey, result);
+    return cloneResult(result);
+  }
+
   const syntax = parser.parseAssignmentSyntax(trimmed);
 
   if (syntax.isAssignment) {
     const { lhs, rhs } = syntax;
 
-    // Case 1: y = expression → graph (horizontal line, can include parameters)
     if (lhs === 'y') {
-      // For y = ..., we allow parameters in RHS (e.g., y = b, y = a * x)
-      // Just need to ensure it parses as a valid expression
       const usedVariables = parser.getAllSymbols(rhs);
       if (usedVariables.includes('y')) {
-        // y cannot appear on RHS
         result = {
           kind: 'invalid',
+          graphMode: null,
           error: 'Unknown symbol: y',
           usedVariables,
-          plotExpression: null,
-          verticalLineX: null
+          plotExpression: null
         };
         cacheResult(cacheKey, result);
         return cloneResult(result);
       }
 
-      // Try to parse the RHS to ensure it's valid
       const parsed = parser.parse(rhs, buildVariableList(usedVariables));
       if (!parsed.isValid) {
         result = {
           kind: 'invalid',
+          graphMode: null,
           error: mapParseError(parsed.error),
           usedVariables,
-          plotExpression: null,
-          verticalLineX: null
+          plotExpression: null
         };
         cacheResult(cacheKey, result);
         return cloneResult(result);
@@ -178,26 +250,40 @@ export const classifyLine = (expression, parser) => {
 
       result = {
         kind: 'graph',
+        graphMode: 'explicit',
         error: null,
         usedVariables,
-        plotExpression: rhs,
-        verticalLineX: null
+        plotExpression: rhs
       };
       cacheResult(cacheKey, result);
       return cloneResult(result);
     }
 
-    // Case 2: x = constant → graph (vertical line)
-    // Requires numeric RHS
     if (lhs === 'x') {
-      const rhsEval = evaluateRHS(rhs, parser);
-      if (!rhsEval.isValid) {
+      const usedVariables = parser.getAllSymbols(rhs);
+      if (usedVariables.includes('x')) {
         result = {
           kind: 'invalid',
+          graphMode: null,
           error: ERROR_MESSAGES.invalidAssignment,
-          usedVariables: [],
-          plotExpression: null,
-          verticalLineX: null
+          usedVariables,
+          plotExpression: null
+        };
+        cacheResult(cacheKey, result);
+        return cloneResult(result);
+      }
+
+      const variables = usedVariables.includes('y')
+        ? buildImplicitVariableList(usedVariables)
+        : buildVariableList(usedVariables);
+      const parsed = parser.parse(rhs, variables);
+      if (!parsed.isValid) {
+        result = {
+          kind: 'invalid',
+          graphMode: null,
+          error: mapParseError(parsed.error),
+          usedVariables,
+          plotExpression: null
         };
         cacheResult(cacheKey, result);
         return cloneResult(result);
@@ -205,25 +291,23 @@ export const classifyLine = (expression, parser) => {
 
       result = {
         kind: 'graph',
+        graphMode: 'implicit',
         error: null,
-        usedVariables: [],
-        plotExpression: VERTICAL_LINE_MARKER,
-        verticalLineX: rhsEval.value
+        usedVariables,
+        plotExpression: `x - (${rhs})`
       };
       cacheResult(cacheKey, result);
       return cloneResult(result);
     }
 
-    // Case 3: parameter assignment (lhs is not x or y)
-    // Requires numeric RHS
     const rhsEval = evaluateRHS(rhs, parser);
     if (!rhsEval.isValid) {
       result = {
         kind: 'invalid',
+        graphMode: null,
         error: ERROR_MESSAGES.invalidAssignment,
         usedVariables: [],
-        plotExpression: null,
-        verticalLineX: null
+        plotExpression: null
       };
       cacheResult(cacheKey, result);
       return cloneResult(result);
@@ -231,18 +315,30 @@ export const classifyLine = (expression, parser) => {
 
     result = {
       kind: 'assignment',
+      graphMode: null,
       paramName: lhs,
       value: rhsEval.value,
       error: null,
       usedVariables: [],
-      plotExpression: null,
-      verticalLineX: null
+      plotExpression: null
     };
     cacheResult(cacheKey, result);
     return cloneResult(result);
   }
 
-  // Not an assignment - classify as graph expression
+  const implicitEq = tryParseImplicitEquation(trimmed, parser);
+  if (implicitEq) {
+    result = {
+      kind: 'graph',
+      graphMode: 'implicit',
+      error: null,
+      usedVariables: implicitEq.usedVariables,
+      plotExpression: implicitEq.plotExpression
+    };
+    cacheResult(cacheKey, result);
+    return cloneResult(result);
+  }
+
   result = classifyGraphExpression(trimmed, parser);
   cacheResult(cacheKey, result);
   return cloneResult(result);

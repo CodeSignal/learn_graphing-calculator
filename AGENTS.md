@@ -1,21 +1,23 @@
 # Repository Contribution Guidelines - CodeSignal CosmoPlot
 This repository contains CodeSignal CosmoPlot, a graphing calculator app with
-live canvas rendering, auto-generated sliders, and a lightweight Node/Vite
-stack. When working on this repo, start by reading this file accurately.
+live function-plot rendering, auto-generated sliders, and a lightweight
+Node/Vite stack. When working on this repo, start by reading this file
+accurately.
 Always update this file at the end of your work whenever you change behavior,
 commands, or architecture.
 
 ## Architecture (what actually runs)
 1. **Client entry**: `client/index.html` mounts the layout, loads design-system
    CSS, then `client/app.js`.
-2. **App orchestrator**: `app.js` wires StateManager, GraphEngine (canvas
-   renderer), SidebarManager, ExpressionList, and the help modal
+2. **App orchestrator**: `app.js` wires StateManager, GraphEngine (renderer
+   controller), SidebarManager, ExpressionList, and the help modal
    (`design-system/components/modal`).
 3. **State & events**:
    - Central store: `core/state-manager.js` (dot-path set/get).
      StateManager manages state only; EventBus handles all notifications.
    - Pub/Sub: `core/event-bus.js` (namespaced events like `state:changed`,
-     `parameters:updated`). EventBus is the single notification mechanism for state changes.
+     `parameters:updated`, `expressions:committed`). EventBus is the single
+     notification mechanism for state changes.
      Supports parent path bubbling (subscribing to `state:changed:parameters` also receives
      notifications for `state:changed:parameters.m.value`), and bubbled parent events provide
      the parent value (not the child value). Use `{ immediate: true }` to receive current
@@ -27,17 +29,31 @@ commands, or architecture.
      parameter detection.
    - Line classification: `math/line-classifier.js` (single source of truth for
      line kinds: assignment/graph/invalid/empty). Uses syntax parser then applies
-     semantic rules. Supports vertical lines (`x = constant`) and horizontal
-     lines (`y = constant`) as graph types.
+     semantic rules. Returns `graphMode` (explicit/implicit/inequality) for
+     mapping to function-plot fnType. Supports: explicit (`y = f(x)`, bare `f(x)`),
+     implicit (e.g. `x^2 + y^2 = 1`, `x = expr`), and inequality detection
+     (rendering deferred).
    - Parameter inference: `math/parameter-utils.js` (derives defined/used params
      from classified lines).
-   - Evaluation: `math/function-evaluator.js` (evaluates expressions at specific
-     points).
-   - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX).
+   - Expression adaptation: `math/expression-adapter.js` (AST-based conversion
+     layer that normalizes expressions for function-plot and produces polished
+     display LaTeX from raw user input).
+   - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX, delegated to
+     `math/expression-adapter.js` for expression-to-LaTeX conversion).
 5. **UI components**:
    - `components/expression-list.js` manages expressions (updates go through
-     `StateManager.set('functions', ...)` which fires `state:changed:functions`).
+     `StateManager.set('functions', ...)` which fires
+     `state:changed:functions`). On blur/Enter commit it publishes
+     `expressions:committed`.
    - `components/sidebar-manager.js` handles resize/toggle.
+   - `graph-engine.js` orchestrates render updates and delegates chart drawing
+     to `renderers/function-plot-renderer.js`. Plot display uses function-plot
+     natives: axis ticks/labels, grid toggle via options, on-curve tip.
+     GraphEngine aspect-locks units at render time by expanding only the
+     smaller axis to match the plot pixel ratio (no cropping), while keeping
+     the canonical state viewport unchanged. Parameter detection is deferred
+     while `.expression-input` is focused and resumes on
+     `expressions:committed`.
 6. **Config**:
    - Primary: `configs/config.json` (loaded first). Fallback:
      `configs/default-config.js` (used when JSON unavailable).
@@ -79,9 +95,13 @@ commands, or architecture.
 - **Expressions**: LineClassifier defines line kinds; GraphEngine backfills
   parameter assignments for any extra symbols detected in graph lines (excluding
   x/y). Assignment lines never plot. Avoid loops when adding detection paths.
+- **Expression adaptation**: Before passing `plotExpression` to function-plot,
+  GraphEngine must call `toFunctionPlotSyntax()` from
+  `math/expression-adapter.js` to normalize `pi/e/ln` aliases without mutating
+  raw user input.
 - **Classification metadata**: `state.functions` entries may include derived
-  classification fields (`kind`, `error`, `paramName`, `value`, `usedVariables`,
-  `plotExpression`, `verticalLineX`) for UI consistency; GraphEngine still
+  classification fields (`kind`, `graphMode`, `error`, `paramName`, `value`,
+  `usedVariables`, `plotExpression`) for UI consistency; GraphEngine still
   classifies from `expression` on each render.
 - **Error handling**: Wrap async; surface meaningful messages; log to console;
   never swallow errors that block rendering.
@@ -106,11 +126,12 @@ commands, or architecture.
   (e.g., `http://localhost:3000?debug=true`)
 
 ## Testing & QA
-- **Automated tests**: Unit tests for math layer (e.g.,
-  `expression-parser.test.js`) run with `npm run test` or `npm run test:run`.
-  Use Vitest; tests live under `tests/` (and may also exist under `client/`).
+- **Automated tests**: Unit tests for math/core/components (including
+  `graph-engine.test.js` and `function-plot-renderer.test.js`) run with
+  `npm run test` or `npm run test:run`. Use Vitest; tests live under `tests/`
+  (and may also exist under `client/`).
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
-  add/edit expressions, confirm canvas redraws, sliders appear for parameters
+  add/edit expressions, confirm plot redraws, sliders appear for parameters
   (e.g., `a*sin(b*x)`), zoom/pan, help modal opens.
 - **Prod sanity**: `npm run build && npm run start:prod`, hit
   `http://localhost:3000`, ensure assets load from `dist/`.
@@ -120,8 +141,8 @@ commands, or architecture.
 ## Security / perf notes
 - Math evaluation runs client-side via math.js; do not inject unchecked user
   input into new Function or eval. Keep parsing through ExpressionParser only.
-- Canvas render throttled via `requestAnimationFrame`; avoid synchronous heavy
-  loops inside render.
+- GraphEngine render requests are throttled via `requestAnimationFrame`; avoid
+  synchronous heavy work or unnecessary rebuild loops in render paths.
 
 ## Documentation discipline
 - Any code change that affects behavior, commands, structure, or conventions

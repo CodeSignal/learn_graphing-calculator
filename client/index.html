@@ -84,7 +84,7 @@
     </button>
 
     <div class="content-area" style="padding: 0; position: relative;">
-      <!-- Toolbar for Canvas -->
+      <!-- Toolbar for Graph -->
       <div
         id="graph-toolbar"
         style="position: absolute; top: 1rem; right: 1rem;
@@ -94,21 +94,7 @@
         <button class="button button-secondary" id="btn-zoom-out" aria-label="Zoom Out">-</button>
       </div>
 
-      <canvas id="graph-canvas" style="width: 100%; height: 100%; display: block;"></canvas>
-
-      <!-- Trace / Cursor Info -->
-      <div
-        id="cursor-info"
-        style="position: absolute; bottom: 1rem; left: 1rem;
-          background: var(--Colors-Box-Background);
-          padding: var(--UI-Spacing-spacing-s);
-          border-radius: var(--UI-Radius-radius-m);
-          box-shadow: var(--Colors-Shadow-Soft);
-          pointer-events: none;
-          opacity: 0.8;
-          font-family: monospace;">
-        x: 0.00, y: 0.00
-      </div>
+      <div id="graph-canvas" style="width: 100%; height: 100%; display: block;"></div>
     </div>
   </main>
 
@@ -131,7 +117,7 @@
       <p>
         CodeSignal CosmoPlot is a graphing calculator that allows you to visualize
         mathematical expressions. Enter expressions using <b>x</b> as the variable,
-        and the graph will be rendered in real-time on the canvas.
+        and the graph will be rendered in real-time in the graph area.
       </p>
     </section>
 

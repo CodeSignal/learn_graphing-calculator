@@ -8,8 +8,7 @@ export default {
     xMax: 10,
     yMin: -10,
     yMax: 10,
-    showGrid: true,
-    showAxes: true
+    showGrid: true
   },
 
   // Initial expressions

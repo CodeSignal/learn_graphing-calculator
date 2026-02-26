@@ -69,8 +69,6 @@ html, body {
 /* ===== APPLICATION VARIABLES ===== */
 :root {
   --canvas-bg: #ffffff;
-  --grid-color: #e0e0e0;
-  --axis-color: #666666;
 }
 
 /* ===== LAYOUT OVERRIDES ===== */
@@ -83,22 +81,35 @@ html, body {
 .bespoke .content-area {
   flex: 1;
   width: auto !important;
-  /* Allow flex to control width */
   min-width: 0;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --canvas-bg: #1a1a1a;
-    --grid-color: #333333;
-    --axis-color: #999999;
   }
 }
 
-/* Ensure canvas takes full space */
+/* Ensure plot container takes full space */
 #graph-canvas {
   background-color: var(--canvas-bg);
-  cursor: crosshair;
+  position: relative;
+  overflow: hidden;
+}
+
+#graph-canvas .function-plot {
+  width: 100%;
+  height: 100%;
+}
+
+/* Hide function-plot legend; sidebar expression list is our legend (no native option) */
+#graph-canvas .function-plot .top-right-legend {
+  display: none;
+}
+
+/* Fix function-plot tip font size, by default it scales with canvas */
+#graph-canvas .function-plot .tip text {
+  font-size: var(--Fonts-Body-Default-xxl) !important;
 }
 
 /* Expression List Item */
@@ -253,22 +264,14 @@ html, body {
   border-right: 1px solid var(--Colors-Stroke-Default);
   background: var(--Colors-Backgrounds-Main-Default);
   transition: transform 0.3s ease;
-  /* Animate toggle only */
-  /* width transition makes resizing jittery, so removed it or limit to non-dragging */
   flex-shrink: 0;
   position: relative;
   z-index: 20;
-  /* Min width handled by JS or here? JS is strictly controlling width style. */
-  /* But let's set a default min-width here too */
   min-width: 0;
   overflow: hidden !important;
-  /* Let inner sections handle scroll */
 }
 
 .sidebar.collapsed {
-  /* Using display: none or transforming? */
-  /* Transform is smoother but requires layout container to hide overflow or flex to adjust */
-  /* Simplest: */
   display: none !important;
 }
 
@@ -280,12 +283,10 @@ html, body {
   width: 5px;
   background: transparent;
   cursor: col-resize;
-  /* Flex item between sidebar and content? */
   flex-shrink: 0;
   z-index: 21;
   transition: background 0.2s;
   margin-left: -2px;
-  /* Overlap slightly? */
 }
 
 .sidebar-resizer:hover,
