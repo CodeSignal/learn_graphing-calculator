@@ -157,6 +157,58 @@ describe('LineClassifier', () => {
     })
   })
 
+  describe('function definition syntax (f(x) = expr)', () => {
+    it('classifies f(x) = x^2 as explicit graph', () => {
+      const result = classifyLine('f(x) = x^2', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('explicit')
+      expect(result.error).toBe(null)
+      expect(result.plotExpression).toBeTruthy()
+    })
+
+    it('classifies g(x) = sin(x) as explicit graph', () => {
+      const result = classifyLine('g(x) = sin(x)', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('explicit')
+      expect(result.error).toBe(null)
+    })
+
+    it('classifies h(x) = a * x + b as explicit graph with params in usedVariables', () => {
+      const result = classifyLine('h(x) = a * x + b', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('explicit')
+      expect(result.error).toBe(null)
+      expect(result.usedVariables).toContain('a')
+      expect(result.usedVariables).toContain('b')
+      expect(result.usedVariables).toContain('x')
+    })
+
+    it('classifies f(x) = 5 as explicit graph (constant body)', () => {
+      const result = classifyLine('f(x) = 5', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('explicit')
+      expect(result.error).toBe(null)
+    })
+
+    it('rejects f(x) = y as invalid (y in RHS)', () => {
+      const result = classifyLine('f(x) = y', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.error).toBe('Unknown symbol: y')
+    })
+
+    it('rejects f(t) = t^2 as invalid (non-x parameter)', () => {
+      const result = classifyLine('f(t) = t^2', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.error).toBe('Expression must include x')
+    })
+
+    it('rejects f(x, y) = x + y as invalid (multi-param)', () => {
+      const result = classifyLine('f(x, y) = x + y', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.error).toBe('Expression must include x')
+    })
+  })
+
   describe('inequalities', () => {
     it('classifies y > x^2 as inequality (deferred)', () => {
       const result = classifyLine('y > x^2', parser)

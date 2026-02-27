@@ -109,7 +109,7 @@ html, body {
 
 /* Fix function-plot tip font size, by default it scales with canvas */
 #graph-canvas .function-plot .tip text {
-  font-size: var(--Fonts-Body-Default-xxl) !important;
+  font-size: var(--Fonts-Body-Default-lg) !important;
 }
 
 /* Expression List Item */

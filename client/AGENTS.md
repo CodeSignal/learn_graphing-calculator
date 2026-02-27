@@ -147,9 +147,11 @@ styling is a last resort.
 - Prod: `npm run build` then `npm run start:prod`.
 
 ## Gotchas
-- LineClassifier auto-detects expression type: explicit (`y = f(x)`, bare `f(x)`),
-  implicit (`x^2 + y^2 = 1`, `x = expr`), inequality (detected, rendering
-  deferred). Users type math; fnType is internal.
+- LineClassifier auto-detects expression type: explicit (`y = f(x)`, `f(x) = expr`,
+  bare `f(x)`), implicit (`x^2 + y^2 = 1`, `x = expr`), inequality (detected,
+  rendering deferred). Users type math; fnType is internal. Function definition
+  syntax (`f(x) = expr`) is treated as explicit; the body becomes `plotExpression`
+  and the function name is ignored (same rendering path as `y = expr`).
 - Keep raw expression text in inputs/state. Plot and LaTeX display conversions
   are target-specific and handled by `math/expression-adapter.js`.
 - Assignment lines must be constants (no `x` on the RHS).

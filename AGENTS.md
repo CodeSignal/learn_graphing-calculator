@@ -25,14 +25,15 @@ commands, or architecture.
 4. **Math layer**:
    - Parsing/validation: `math/expression-parser.js` (math.js wrapper, caches,
      requires `x`, optionally `y`; warns on unknown variables). Provides
-     `parseAssignmentSyntax()` for pure syntax detection and `isParameter()` for
-     parameter detection.
+     `parseAssignmentSyntax()` for pure syntax detection, `parseFunctionDefinitionSyntax()`
+     for `f(x) = expr` style detection, and `isParameter()` for parameter detection.
    - Line classification: `math/line-classifier.js` (single source of truth for
      line kinds: assignment/graph/invalid/empty). Uses syntax parser then applies
      semantic rules. Returns `graphMode` (explicit/implicit/inequality) for
-     mapping to function-plot fnType. Supports: explicit (`y = f(x)`, bare `f(x)`),
-     implicit (e.g. `x^2 + y^2 = 1`, `x = expr`), and inequality detection
-     (rendering deferred).
+     mapping to function-plot fnType. Supports: explicit (`y = f(x)`, `f(x) = expr`,
+     bare `f(x)`), implicit (e.g. `x^2 + y^2 = 1`, `x = expr`), and inequality
+     detection (rendering deferred). Function definition syntax (`f(x) = expr`) is
+     treated as explicit with the body as `plotExpression`; sole parameter must be `x`.
    - Parameter inference: `math/parameter-utils.js` (derives defined/used params
      from classified lines).
    - Expression adaptation: `math/expression-adapter.js` (AST-based conversion

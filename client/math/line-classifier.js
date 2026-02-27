@@ -326,6 +326,60 @@ export const classifyLine = (expression, parser) => {
     return cloneResult(result);
   }
 
+  const funcDef = parser.parseFunctionDefinitionSyntax(trimmed);
+  if (funcDef.isFunctionDef) {
+    // f(x) = expr with exactly 'x' as the sole parameter -> explicit graph
+    if (funcDef.params.length === 1 && funcDef.params[0] === 'x' && funcDef.body !== null) {
+      const bodyVars = parser.getAllSymbols(funcDef.body);
+
+      if (bodyVars.includes('y')) {
+        result = {
+          kind: 'invalid',
+          graphMode: null,
+          error: 'Unknown symbol: y',
+          usedVariables: bodyVars,
+          plotExpression: null
+        };
+        cacheResult(cacheKey, result);
+        return cloneResult(result);
+      }
+
+      const parsed = parser.parse(funcDef.body, buildVariableList(bodyVars));
+      if (!parsed.isValid) {
+        result = {
+          kind: 'invalid',
+          graphMode: null,
+          error: mapParseError(parsed.error),
+          usedVariables: bodyVars,
+          plotExpression: null
+        };
+        cacheResult(cacheKey, result);
+        return cloneResult(result);
+      }
+
+      result = {
+        kind: 'graph',
+        graphMode: 'explicit',
+        error: null,
+        usedVariables: bodyVars,
+        plotExpression: funcDef.body
+      };
+      cacheResult(cacheKey, result);
+      return cloneResult(result);
+    }
+
+    // Non-x parameter or multi-param defs: fall through to invalid
+    result = {
+      kind: 'invalid',
+      graphMode: null,
+      error: ERROR_MESSAGES.missingX,
+      usedVariables: [],
+      plotExpression: null
+    };
+    cacheResult(cacheKey, result);
+    return cloneResult(result);
+  }
+
   const implicitEq = tryParseImplicitEquation(trimmed, parser);
   if (implicitEq) {
     result = {

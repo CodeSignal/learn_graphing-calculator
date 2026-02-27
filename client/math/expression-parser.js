@@ -290,6 +290,35 @@ export default class ExpressionParser {
 
 
   /**
+   * Parse function definition syntax - detects f(x) = expr style expressions
+   * Returns the function name, parameter list, and body string when detected.
+   * @param {string} expression - Expression string to check
+   * @returns {{isFunctionDef: boolean, name: string|null, params: string[], body: string|null}}
+   */
+  parseFunctionDefinitionSyntax(expression) {
+    if (!expression || typeof expression !== 'string') {
+      return { isFunctionDef: false, name: null, params: [], body: null };
+    }
+
+    try {
+      const trimmed = expression.trim();
+      const node = math.parse(trimmed);
+
+      if (node.type !== 'FunctionAssignmentNode') {
+        return { isFunctionDef: false, name: null, params: [], body: null };
+      }
+
+      const name = node.name;
+      const params = Array.isArray(node.params) ? [...node.params] : [];
+      const body = node.expr ? node.expr.toString() : null;
+
+      return { isFunctionDef: true, name, params, body };
+    } catch (error) {
+      return { isFunctionDef: false, name: null, params: [], body: null };
+    }
+  }
+
+  /**
    * Get list of constant names that should be excluded from variable detection
    * @private
    * @returns {string[]} Array of constant names

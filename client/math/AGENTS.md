@@ -9,6 +9,9 @@ alter math behavior.
    symbols (variables and parameters). Provides:
    - `parseAssignmentSyntax()`: Pure syntax detection for assignments (returns
      `{isAssignment, lhs, rhs}` without semantic filtering)
+   - `parseFunctionDefinitionSyntax()`: Detects `FunctionAssignmentNode` syntax,
+     i.e. `f(x) = expr` style definitions (returns
+     `{isFunctionDef, name, params, body}` without semantic filtering)
    - `isParameter()`: Detects parameter names (excluding x/y and constants)
 2. `shared-parser.js`: Singleton ExpressionParser instance so caching is shared
    across components.
@@ -16,12 +19,15 @@ alter math behavior.
    `assignment`, `invalid`, `empty`). Returns `graphMode` for function-plot:
    `explicit`, `implicit`, or `inequality` (rendering deferred). Rules:
    - `y = expr` → `graph`, `graphMode: 'explicit'`
+   - `f(x) = expr` (function definition, sole param must be `x`) → `graph`,
+     `graphMode: 'explicit'`, `plotExpression: expr` (same as `y = expr`)
    - `x = expr` → `graph`, `graphMode: 'implicit'`, `plotExpression: 'x - (expr)'`
      (supports constants, parameters, and y-dependent expressions; rejects if x in RHS)
    - `expr = expr` (both sides non-simple) → `graph`, `graphMode: 'implicit'`
    - Bare `f(x,y)` (both vars) → `graph`, `graphMode: 'implicit'`
    - `>=`, `<=`, `>`, `<` → `graph`, `graphMode: 'inequality'` (deferred)
    - `param = constant` → `assignment`
+   - `f(t) = expr` or multi-param `f(x,y) = expr` → `invalid` (non-x parameter)
 4. `parameter-utils.js`: Derives defined/used parameters and missing assignments
    from classified lines.
 5. `parameter-defaults.js`: Default slider metadata `{ value, min, max, step }`.
@@ -40,9 +46,11 @@ alter math behavior.
    with KaTeX. `toLatex()` delegates to `expression-adapter.js`.
 
 ## Expectations & constraints
-- **Syntax vs. Semantics separation**: `parseAssignmentSyntax()` handles pure
-  syntax detection; `classifyLine()` applies semantic rules. This separation
-  enables consistent handling of all assignment types (`x =`, `y =`, `param =`).
+- **Syntax vs. Semantics separation**: `parseAssignmentSyntax()` and
+  `parseFunctionDefinitionSyntax()` handle pure syntax detection; `classifyLine()`
+  applies semantic rules. This separation enables consistent handling of all
+  assignment types (`x =`, `y =`, `param =`) and function definitions
+  (`f(x) = expr`).
 - LineClassifier enforces graph semantics: graph lines require `x` unless
   written as `y = ...`, `x = ...`, or implicit (both x and y).
 - Assignment lines must be constant expressions (`a = 1`, `b = pi`); variable-
