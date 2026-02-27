@@ -319,6 +319,200 @@ export default class ExpressionParser {
   }
 
   /**
+   * Parse points syntax - detects points([[x,y], ...]) expressions
+   * Returns point coordinate expressions when detected.
+   * @param {string} expression - Expression string to check
+   * @returns {{
+   *   isPoints: boolean,
+   *   isMalformed: boolean,
+   *   points: string[][],
+   *   error: string|null
+   * }}
+   */
+  parsePointsSyntax(expression) {
+    if (!expression || typeof expression !== 'string') {
+      return { isPoints: false, isMalformed: false, points: [], error: null };
+    }
+
+    const trimmed = expression.trim();
+    const pointsCallPattern = /^points\s*\(/;
+
+    try {
+      const node = math.parse(trimmed);
+
+      if (node.type !== 'FunctionNode' ||
+        node.fn?.type !== 'SymbolNode' ||
+        node.fn.name !== 'points') {
+        return { isPoints: false, isMalformed: false, points: [], error: null };
+      }
+
+      if (!Array.isArray(node.args) || node.args.length !== 1) {
+        return {
+          isPoints: true,
+          isMalformed: true,
+          points: [],
+          error: 'points() expects exactly one argument'
+        };
+      }
+
+      const container = node.args[0];
+      if (container?.type !== 'ArrayNode' || !Array.isArray(container.items)) {
+        return {
+          isPoints: true,
+          isMalformed: true,
+          points: [],
+          error: 'points() expects an array of [x, y] pairs'
+        };
+      }
+
+      const points = [];
+      for (const item of container.items) {
+        if (item?.type !== 'ArrayNode' || !Array.isArray(item.items) || item.items.length !== 2) {
+          return {
+            isPoints: true,
+            isMalformed: true,
+            points: [],
+            error: 'Each point must be a [x, y] pair'
+          };
+        }
+
+        points.push([item.items[0].toString(), item.items[1].toString()]);
+      }
+
+      if (points.length === 0) {
+        return {
+          isPoints: true,
+          isMalformed: true,
+          points: [],
+          error: 'points() requires at least one [x, y] pair'
+        };
+      }
+
+      return { isPoints: true, isMalformed: false, points, error: null };
+    } catch (error) {
+      if (pointsCallPattern.test(trimmed)) {
+        return {
+          isPoints: true,
+          isMalformed: true,
+          points: [],
+          error: 'Invalid points syntax'
+        };
+      }
+      return { isPoints: false, isMalformed: false, points: [], error: null };
+    }
+  }
+
+  /**
+   * Parse vector syntax - detects vector([vx, vy], [ox, oy]?) expressions
+   * Returns vector and optional offset coordinate expressions when detected.
+   * @param {string} expression - Expression string to check
+   * @returns {{
+   *   isVector: boolean,
+   *   isMalformed: boolean,
+   *   vector: string[]|null,
+   *   offset: string[]|null,
+   *   error: string|null
+   * }}
+   */
+  parseVectorSyntax(expression) {
+    if (!expression || typeof expression !== 'string') {
+      return {
+        isVector: false,
+        isMalformed: false,
+        vector: null,
+        offset: null,
+        error: null
+      };
+    }
+
+    const trimmed = expression.trim();
+    const vectorCallPattern = /^vector\s*\(/;
+
+    const toPair = (node) => {
+      if (node?.type !== 'ArrayNode' || !Array.isArray(node.items) || node.items.length !== 2) {
+        return null;
+      }
+      return [node.items[0].toString(), node.items[1].toString()];
+    };
+
+    try {
+      const node = math.parse(trimmed);
+
+      if (node.type !== 'FunctionNode' ||
+        node.fn?.type !== 'SymbolNode' ||
+        node.fn.name !== 'vector') {
+        return {
+          isVector: false,
+          isMalformed: false,
+          vector: null,
+          offset: null,
+          error: null
+        };
+      }
+
+      if (!Array.isArray(node.args) || (node.args.length !== 1 && node.args.length !== 2)) {
+        return {
+          isVector: true,
+          isMalformed: true,
+          vector: null,
+          offset: null,
+          error: 'vector() expects [vx, vy] and optional [ox, oy]'
+        };
+      }
+
+      const vector = toPair(node.args[0]);
+      if (!vector) {
+        return {
+          isVector: true,
+          isMalformed: true,
+          vector: null,
+          offset: null,
+          error: 'vector() first argument must be [vx, vy]'
+        };
+      }
+
+      let offset = null;
+      if (node.args.length === 2) {
+        offset = toPair(node.args[1]);
+        if (!offset) {
+          return {
+            isVector: true,
+            isMalformed: true,
+            vector: null,
+            offset: null,
+            error: 'vector() second argument must be [ox, oy]'
+          };
+        }
+      }
+
+      return {
+        isVector: true,
+        isMalformed: false,
+        vector,
+        offset,
+        error: null
+      };
+    } catch (error) {
+      if (vectorCallPattern.test(trimmed)) {
+        return {
+          isVector: true,
+          isMalformed: true,
+          vector: null,
+          offset: null,
+          error: 'Invalid vector syntax'
+        };
+      }
+      return {
+        isVector: false,
+        isMalformed: false,
+        vector: null,
+        offset: null,
+        error: null
+      };
+    }
+  }
+
+  /**
    * Get list of constant names that should be excluded from variable detection
    * @private
    * @returns {string[]} Array of constant names
@@ -338,7 +532,7 @@ export default class ExpressionParser {
       'sinh', 'cosh', 'tanh',
       'sqrt', 'abs', 'exp', 'log', 'log10', 'ln',
       'floor', 'ceil', 'round', 'sign',
-      'min', 'max', 'pow'
+      'min', 'max', 'pow', 'points', 'vector'
     ];
   }
 

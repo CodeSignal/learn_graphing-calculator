@@ -305,6 +305,7 @@ export default class GraphEngine {
   mapFunctionsToPlotData(functions, scopeValues) {
     const data = [];
     const meta = [];
+    const scope = { ...scopeValues };
 
     (functions || []).forEach((func) => {
       if (!func.visible || !func.expression) return;
@@ -312,17 +313,17 @@ export default class GraphEngine {
       const classification = classifyLine(func.expression, sharedParser);
       if (classification.kind !== 'graph' || classification.error) return;
 
-      const plotExpression = classification.plotExpression;
-      if (!plotExpression) return;
-      const adaptedExpression = toFunctionPlotSyntax(plotExpression);
-      if (!adaptedExpression) return;
-
       switch (classification.graphMode) {
         case 'explicit': {
+          const plotExpression = classification.plotExpression;
+          if (!plotExpression) break;
+          const adaptedExpression = toFunctionPlotSyntax(plotExpression);
+          if (!adaptedExpression) break;
+
           const datum = {
             fnType: 'linear',
             fn: adaptedExpression,
-            scope: { ...scopeValues },
+            scope: { ...scope },
             color: func.color
           };
 
@@ -332,7 +333,7 @@ export default class GraphEngine {
               : computeDerivative(plotExpression);
 
             if (derivFn) {
-              datum.derivative = { fn: derivFn, scope: { ...scopeValues } };
+              datum.derivative = { fn: derivFn, scope: { ...scope } };
               if (typeof func.derivative.x0 === 'number') {
                 datum.derivative.x0 = func.derivative.x0;
               }
@@ -346,7 +347,7 @@ export default class GraphEngine {
             datum.secants = func.secants
               .filter((s) => typeof s?.x0 === 'number')
               .map((s) => {
-                const secant = { x0: s.x0, scope: { ...scopeValues } };
+                const secant = { x0: s.x0, scope: { ...scope } };
                 if (typeof s.x1 === 'number') secant.x1 = s.x1;
                 if (s.updateOnMouseMove === true) secant.updateOnMouseMove = true;
                 return secant;
@@ -358,15 +359,59 @@ export default class GraphEngine {
           meta.push({ id: func.id });
           break;
         }
-        case 'implicit':
+        case 'implicit': {
+          const plotExpression = classification.plotExpression;
+          if (!plotExpression) break;
+          const adaptedExpression = toFunctionPlotSyntax(plotExpression);
+          if (!adaptedExpression) break;
+
           data.push({
             fnType: 'implicit',
             fn: adaptedExpression,
-            scope: { ...scopeValues },
+            scope: { ...scope },
             color: func.color
           });
           meta.push({ id: func.id });
           break;
+        }
+        case 'points': {
+          const points = this.evaluatePointPairs(classification.plotData?.points, scope);
+          if (!points) break;
+
+          data.push({
+            fnType: 'points',
+            graphType: 'scatter',
+            sampler: 'builtIn',
+            points,
+            color: func.color
+          });
+          meta.push({ id: func.id });
+          break;
+        }
+        case 'vector': {
+          const vectorValues = this.evaluateCoordinatePair(
+            classification.plotData?.vector,
+            scope
+          );
+          if (!vectorValues) break;
+
+          const offsetValues = this.evaluateCoordinatePair(
+            classification.plotData?.offset || ['0', '0'],
+            scope
+          );
+          if (!offsetValues) break;
+
+          data.push({
+            fnType: 'vector',
+            graphType: 'polyline',
+            sampler: 'builtIn',
+            vector: vectorValues,
+            offset: offsetValues,
+            color: func.color
+          });
+          meta.push({ id: func.id });
+          break;
+        }
         case 'inequality':
           break;
         default:
@@ -375,6 +420,53 @@ export default class GraphEngine {
     });
 
     return { data, meta };
+  }
+
+  evaluateCoordinateExpression(expression, scopeValues) {
+    if (typeof expression !== 'string' || !expression.trim()) {
+      return null;
+    }
+
+    const variables = sharedParser.getAllSymbols(expression);
+    const parsed = sharedParser.parse(expression, variables);
+    if (!parsed.isValid) {
+      return null;
+    }
+
+    const value = parsed.evaluate(scopeValues || {});
+    return Number.isFinite(value) ? value : null;
+  }
+
+  evaluateCoordinatePair(pair, scopeValues) {
+    if (!Array.isArray(pair) || pair.length !== 2) {
+      return null;
+    }
+
+    const x = this.evaluateCoordinateExpression(pair[0], scopeValues);
+    const y = this.evaluateCoordinateExpression(pair[1], scopeValues);
+
+    if (x === null || y === null) {
+      return null;
+    }
+
+    return [x, y];
+  }
+
+  evaluatePointPairs(pairs, scopeValues) {
+    if (!Array.isArray(pairs) || pairs.length === 0) {
+      return null;
+    }
+
+    const evaluatedPoints = [];
+    for (const pair of pairs) {
+      const evaluated = this.evaluateCoordinatePair(pair, scopeValues);
+      if (!evaluated) {
+        return null;
+      }
+      evaluatedPoints.push(evaluated);
+    }
+
+    return evaluatedPoints;
   }
 
   /**

@@ -310,6 +310,91 @@ describe('GraphEngine (function-plot migration)', () => {
     })
   })
 
+  it('maps points syntax to scatter datum', () => {
+    const engine = new GraphEngine('graph-canvas')
+
+    const { data, meta } = engine.mapFunctionsToPlotData([
+      { id: 'p1', expression: 'points([[0,0],[1,4]])', color: '#08f', visible: true }
+    ], {})
+
+    expect(data).toHaveLength(1)
+    expect(data[0]).toEqual({
+      fnType: 'points',
+      graphType: 'scatter',
+      sampler: 'builtIn',
+      points: [[0, 0], [1, 4]],
+      color: '#08f'
+    })
+    expect(meta).toEqual([{ id: 'p1' }])
+  })
+
+  it('evaluates points coordinates against parameter scope', () => {
+    const engine = new GraphEngine('graph-canvas')
+
+    const { data } = engine.mapFunctionsToPlotData([
+      {
+        id: 'p2',
+        expression: 'points([[a, 1], [b + 1, 2]])',
+        color: '#804',
+        visible: true
+      }
+    ], { a: 2, b: 4 })
+
+    expect(data).toHaveLength(1)
+    expect(data[0].fnType).toBe('points')
+    expect(data[0].points).toEqual([[2, 1], [5, 2]])
+  })
+
+  it('maps vector syntax to vector datum with default offset', () => {
+    const engine = new GraphEngine('graph-canvas')
+
+    const { data } = engine.mapFunctionsToPlotData([
+      { id: 'vec1', expression: 'vector([3,2])', color: '#0b4', visible: true }
+    ], {})
+
+    expect(data).toHaveLength(1)
+    expect(data[0]).toEqual({
+      fnType: 'vector',
+      graphType: 'polyline',
+      sampler: 'builtIn',
+      vector: [3, 2],
+      offset: [0, 0],
+      color: '#0b4'
+    })
+  })
+
+  it('maps vector syntax with parameterized offset', () => {
+    const engine = new GraphEngine('graph-canvas')
+
+    const { data } = engine.mapFunctionsToPlotData([
+      {
+        id: 'vec2',
+        expression: 'vector([a,2],[1,b])',
+        color: '#f50',
+        visible: true
+      }
+    ], { a: 6, b: -3 })
+
+    expect(data).toHaveLength(1)
+    expect(data[0].fnType).toBe('vector')
+    expect(data[0].vector).toEqual([6, 2])
+    expect(data[0].offset).toEqual([1, -3])
+  })
+
+  it('skips points/vector datum when coordinate evaluation is invalid', () => {
+    const engine = new GraphEngine('graph-canvas')
+
+    const points = engine.mapFunctionsToPlotData([
+      { id: 'p3', expression: 'points([[a,1]])', color: '#111', visible: true }
+    ], {})
+    expect(points.data).toHaveLength(0)
+
+    const vector = engine.mapFunctionsToPlotData([
+      { id: 'v3', expression: 'vector([a,2])', color: '#222', visible: true }
+    ], {})
+    expect(vector.data).toHaveLength(0)
+  })
+
   it('skips inequality expressions (rendering deferred)', () => {
     const engine = new GraphEngine('graph-canvas')
 

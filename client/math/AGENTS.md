@@ -12,12 +12,17 @@ alter math behavior.
    - `parseFunctionDefinitionSyntax()`: Detects `FunctionAssignmentNode` syntax,
      i.e. `f(x) = expr` style definitions (returns
      `{isFunctionDef, name, params, body}` without semantic filtering)
+   - `parsePointsSyntax()`: Detects `points([[x,y], ...])` syntax and extracts
+     coordinate expression pairs.
+   - `parseVectorSyntax()`: Detects `vector([vx,vy],[ox,oy]?)` syntax and
+     extracts vector/offset coordinate expressions.
    - `isParameter()`: Detects parameter names (excluding x/y and constants)
 2. `shared-parser.js`: Singleton ExpressionParser instance so caching is shared
    across components.
 3. `line-classifier.js`: Single source of truth for line kinds (`graph`,
    `assignment`, `invalid`, `empty`). Returns `graphMode` for function-plot:
-   `explicit`, `implicit`, or `inequality` (rendering deferred). Rules:
+   `explicit`, `implicit`, `points`, `vector`, or `inequality`
+   (rendering deferred). Rules:
    - `y = expr` → `graph`, `graphMode: 'explicit'`
    - `f(x) = expr` (function definition, sole param must be `x`) → `graph`,
      `graphMode: 'explicit'`, `plotExpression: expr` (same as `y = expr`)
@@ -25,6 +30,11 @@ alter math behavior.
      (supports constants, parameters, and y-dependent expressions; rejects if x in RHS)
    - `expr = expr` (both sides non-simple) → `graph`, `graphMode: 'implicit'`
    - Bare `f(x,y)` (both vars) → `graph`, `graphMode: 'implicit'`
+   - `points([[x,y], ...])` → `graph`, `graphMode: 'points'`, `plotData.points`
+   - `vector([vx,vy],[ox,oy]?)` → `graph`, `graphMode: 'vector'`,
+     `plotData.vector`/`plotData.offset` (defaults offset to `['0', '0']`)
+   - `points`/`vector` coordinates may use parameters/constants but must not use
+     `x` or `y`
    - `>=`, `<=`, `>`, `<` → `graph`, `graphMode: 'inequality'` (deferred)
    - `param = constant` → `assignment`
    - `f(t) = expr` or multi-param `f(x,y) = expr` → `invalid` (non-x parameter)
@@ -49,8 +59,9 @@ alter math behavior.
 - **Syntax vs. Semantics separation**: `parseAssignmentSyntax()` and
   `parseFunctionDefinitionSyntax()` handle pure syntax detection; `classifyLine()`
   applies semantic rules. This separation enables consistent handling of all
-  assignment types (`x =`, `y =`, `param =`) and function definitions
-  (`f(x) = expr`).
+  assignment types (`x =`, `y =`, `param =`), function definitions
+  (`f(x) = expr`), and non-function graph payloads (`points(...)`,
+  `vector(...)`).
 - LineClassifier enforces graph semantics: graph lines require `x` unless
   written as `y = ...`, `x = ...`, or implicit (both x and y).
 - Assignment lines must be constant expressions (`a = 1`, `b = pi`); variable-

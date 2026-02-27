@@ -220,4 +220,49 @@ describe('ExpressionList', () => {
     expect(item.section).toBe('expressions')
     expect(item.element.hidden).toBe(true)
   })
+
+  it('keeps points/vector rows in expressions tab', () => {
+    const expressionList = new ExpressionList('expression-list', 'btn-add-expression')
+    expressionList.init()
+    expressionList.render([
+      { id: 'p1', expression: 'points([[0,0],[1,1]])', color: '#111', visible: true },
+      { id: 'v1', expression: 'vector([3,2])', color: '#222', visible: true }
+    ])
+
+    const pointsItem = expressionList.renderedItems.get('p1')
+    const vectorItem = expressionList.renderedItems.get('v1')
+
+    expect(pointsItem.section).toBe('expressions')
+    expect(vectorItem.section).toBe('expressions')
+
+    expressionList.setActiveSection('parameters')
+    expect(pointsItem.element.hidden).toBe(true)
+    expect(vectorItem.element.hidden).toBe(true)
+
+    expressionList.setActiveSection('expressions')
+    expect(pointsItem.element.hidden).toBe(false)
+    expect(vectorItem.element.hidden).toBe(false)
+  })
+
+  it('routes assignment rows to parameters tab while points stay in expressions', () => {
+    const expressionList = new ExpressionList('expression-list', 'btn-add-expression')
+    expressionList.init()
+    expressionList.render([
+      { id: 'p2', expression: 'points([[a,1]])', color: '#111', visible: true },
+      { id: 'param_a', expression: 'a = 1', color: '#222', visible: true }
+    ])
+
+    const pointsItem = expressionList.renderedItems.get('p2')
+    const assignmentItem = expressionList.renderedItems.get('param_a')
+
+    expressionList.setActiveSection('expressions')
+    expect(pointsItem.section).toBe('expressions')
+    expect(pointsItem.element.hidden).toBe(false)
+    expect(assignmentItem.section).toBe('parameters')
+    expect(assignmentItem.element.hidden).toBe(true)
+
+    expressionList.setActiveSection('parameters')
+    expect(pointsItem.element.hidden).toBe(true)
+    expect(assignmentItem.element.hidden).toBe(false)
+  })
 })

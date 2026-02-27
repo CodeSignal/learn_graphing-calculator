@@ -25,15 +25,22 @@ commands, or architecture.
 4. **Math layer**:
    - Parsing/validation: `math/expression-parser.js` (math.js wrapper, caches,
      requires `x`, optionally `y`; warns on unknown variables). Provides
-     `parseAssignmentSyntax()` for pure syntax detection, `parseFunctionDefinitionSyntax()`
-     for `f(x) = expr` style detection, and `isParameter()` for parameter detection.
+     `parseAssignmentSyntax()` for pure syntax detection,
+     `parseFunctionDefinitionSyntax()` for `f(x) = expr` style detection,
+     `parsePointsSyntax()` for `points([[x,y], ...])`,
+     `parseVectorSyntax()` for `vector([vx,vy],[ox,oy]?)`, and `isParameter()`
+     for parameter detection.
    - Line classification: `math/line-classifier.js` (single source of truth for
      line kinds: assignment/graph/invalid/empty). Uses syntax parser then applies
-     semantic rules. Returns `graphMode` (explicit/implicit/inequality) for
-     mapping to function-plot fnType. Supports: explicit (`y = f(x)`, `f(x) = expr`,
-     bare `f(x)`), implicit (e.g. `x^2 + y^2 = 1`, `x = expr`), and inequality
-     detection (rendering deferred). Function definition syntax (`f(x) = expr`) is
-     treated as explicit with the body as `plotExpression`; sole parameter must be `x`.
+     semantic rules. Returns `graphMode`
+     (explicit/implicit/inequality/points/vector) for mapping to function-plot
+     fnType. Supports: explicit (`y = f(x)`, `f(x) = expr`, bare `f(x)`),
+     implicit (e.g. `x^2 + y^2 = 1`, `x = expr`), points
+     (`points([[x,y], ...])`), vector (`vector([vx,vy],[ox,oy]?)`), and
+     inequality detection (rendering deferred). Function definition syntax
+     (`f(x) = expr`) is treated as explicit with the body as `plotExpression`;
+     sole parameter must be `x`. Points/vector coordinates may use parameters
+     but cannot include `x` or `y`.
    - Parameter inference: `math/parameter-utils.js` (derives defined/used params
      from classified lines).
    - Expression adaptation: `math/expression-adapter.js` (AST-based conversion
@@ -75,6 +82,12 @@ commands, or architecture.
      - For explicit expressions with `func.secants`, maps the array onto
        function-plot secant objects (forwarding `x0`, `x1`,
        `updateOnMouseMove`) with `scope` injected from current parameters.
+     - For `graphMode: 'points'`, maps to
+       `{ fnType: 'points', graphType: 'scatter', sampler: 'builtIn', points }`
+       after evaluating coordinate expressions against current parameter scope.
+     - For `graphMode: 'vector'`, maps to
+       `{ fnType: 'vector', graphType: 'polyline', sampler: 'builtIn', vector, offset }`
+       after evaluating coordinate expressions against current parameter scope.
 6. **Config**:
    - Primary: `configs/config.json` (loaded first). Fallback:
      `configs/default-config.js` (used when JSON unavailable).
@@ -126,6 +139,8 @@ commands, or architecture.
   name composer in the `θ` tab; names must match `[A-Za-z_][A-Za-z0-9_]*`,
   cannot be `x`/`y`, and cannot duplicate existing assignment names. Avoid loops
   when adding detection paths.
+  `points` and `vector` are reserved function names and must not be inferred as
+  parameter symbols.
   The inline composer's show/hide behavior relies on native `hidden` plus an
   explicit `.expression-parameter-composer[hidden]` CSS rule.
 - **Expression adaptation**: Before passing `plotExpression` to function-plot,
@@ -147,8 +162,8 @@ commands, or architecture.
   which triggers a rebuild.
 - **Classification metadata**: `state.functions` entries may include derived
   classification fields (`kind`, `graphMode`, `error`, `paramName`, `value`,
-  `usedVariables`, `plotExpression`) for UI consistency; GraphEngine still
-  classifies from `expression` on each render.
+  `usedVariables`, `plotExpression`, `plotData`) for UI consistency;
+  GraphEngine still classifies from `expression` on each render.
 - **Error handling**: Wrap async; surface meaningful messages; log to console;
   never swallow errors that block rendering.
 - **Styling**: Keep line length ≤100 chars. Kebab-case filenames. No magic

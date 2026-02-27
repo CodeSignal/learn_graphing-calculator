@@ -265,6 +265,18 @@ describe('ExpressionParser', () => {
       expect(vars).not.toContain('cos')
     })
 
+    it('should exclude points/vector function names from symbol extraction', () => {
+      const pointsVars = parser.getAllSymbols('points([[a, 1], [b, 2]])')
+      expect(pointsVars).toContain('a')
+      expect(pointsVars).toContain('b')
+      expect(pointsVars).not.toContain('points')
+
+      const vectorVars = parser.getAllSymbols('vector([u, v], [1, 2])')
+      expect(vectorVars).toContain('u')
+      expect(vectorVars).toContain('v')
+      expect(vectorVars).not.toContain('vector')
+    })
+
     it('should return empty array for invalid expressions in getAllSymbols', () => {
       expect(parser.getAllSymbols('invalid+++')).toEqual([])
       expect(parser.getAllSymbols(null)).toEqual([])
@@ -399,6 +411,66 @@ describe('ExpressionParser', () => {
     })
   })
 
+  describe('parsePointsSyntax', () => {
+    it('detects valid points syntax and extracts coordinate expressions', () => {
+      const result = parser.parsePointsSyntax('points([[1, 2], [a + 1, b]])')
+      expect(result.isPoints).toBe(true)
+      expect(result.isMalformed).toBe(false)
+      expect(result.points).toEqual([['1', '2'], ['a + 1', 'b']])
+    })
+
+    it('marks malformed points syntax when shape is invalid', () => {
+      const result = parser.parsePointsSyntax('points([1, 2])')
+      expect(result.isPoints).toBe(true)
+      expect(result.isMalformed).toBe(true)
+      expect(result.error).toBeTruthy()
+    })
+
+    it('returns not-points for non-points expressions', () => {
+      const result = parser.parsePointsSyntax('x^2 + 1')
+      expect(result).toEqual({
+        isPoints: false,
+        isMalformed: false,
+        points: [],
+        error: null
+      })
+    })
+  })
+
+  describe('parseVectorSyntax', () => {
+    it('detects valid vector syntax with optional offset', () => {
+      const withOffset = parser.parseVectorSyntax('vector([a, 2], [1, b])')
+      expect(withOffset.isVector).toBe(true)
+      expect(withOffset.isMalformed).toBe(false)
+      expect(withOffset.vector).toEqual(['a', '2'])
+      expect(withOffset.offset).toEqual(['1', 'b'])
+
+      const withoutOffset = parser.parseVectorSyntax('vector([3, 4])')
+      expect(withoutOffset.isVector).toBe(true)
+      expect(withoutOffset.isMalformed).toBe(false)
+      expect(withoutOffset.vector).toEqual(['3', '4'])
+      expect(withoutOffset.offset).toBe(null)
+    })
+
+    it('marks malformed vector syntax when shape is invalid', () => {
+      const result = parser.parseVectorSyntax('vector([1, 2, 3])')
+      expect(result.isVector).toBe(true)
+      expect(result.isMalformed).toBe(true)
+      expect(result.error).toBeTruthy()
+    })
+
+    it('returns not-vector for non-vector expressions', () => {
+      const result = parser.parseVectorSyntax('x + 1')
+      expect(result).toEqual({
+        isVector: false,
+        isMalformed: false,
+        vector: null,
+        offset: null,
+        error: null
+      })
+    })
+  })
+
 
   describe('Cache Functionality', () => {
     it('should increment cache hits on repeated parsing', () => {
@@ -520,5 +592,3 @@ describe('ExpressionParser', () => {
     })
   })
 })
-
-

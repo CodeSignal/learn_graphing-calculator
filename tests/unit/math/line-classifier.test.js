@@ -209,6 +209,70 @@ describe('LineClassifier', () => {
     })
   })
 
+  describe('points syntax', () => {
+    it('classifies points([[x,y], ...]) as points graph mode', () => {
+      const result = classifyLine('points([[1, 2], [a + 1, b]])', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('points')
+      expect(result.error).toBe(null)
+      expect(result.plotExpression).toBe(null)
+      expect(result.plotData).toEqual({
+        type: 'points',
+        points: [['1', '2'], ['a + 1', 'b']]
+      })
+      expect(result.usedVariables).toContain('a')
+      expect(result.usedVariables).toContain('b')
+    })
+
+    it('rejects malformed points syntax', () => {
+      const result = classifyLine('points([1, 2])', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.graphMode).toBe(null)
+      expect(result.error).toBeTruthy()
+    })
+
+    it('rejects points coordinates that include x or y', () => {
+      const result = classifyLine('points([[x, 1], [2, 3]])', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.error).toBe('Coordinates cannot include x or y')
+    })
+  })
+
+  describe('vector syntax', () => {
+    it('classifies vector([vx,vy],[ox,oy]) as vector graph mode', () => {
+      const result = classifyLine('vector([u, v], [1, b])', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('vector')
+      expect(result.error).toBe(null)
+      expect(result.plotExpression).toBe(null)
+      expect(result.plotData).toEqual({
+        type: 'vector',
+        vector: ['u', 'v'],
+        offset: ['1', 'b']
+      })
+      expect(result.usedVariables).toContain('u')
+      expect(result.usedVariables).toContain('v')
+      expect(result.usedVariables).toContain('b')
+    })
+
+    it('defaults missing vector offset to origin', () => {
+      const result = classifyLine('vector([3, 4])', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('vector')
+      expect(result.plotData).toEqual({
+        type: 'vector',
+        vector: ['3', '4'],
+        offset: ['0', '0']
+      })
+    })
+
+    it('rejects vector coordinates that include x or y', () => {
+      const result = classifyLine('vector([y, 2])', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.error).toBe('Coordinates cannot include x or y')
+    })
+  })
+
   describe('inequalities', () => {
     it('classifies y > x^2 as inequality (deferred)', () => {
       const result = classifyLine('y > x^2', parser)

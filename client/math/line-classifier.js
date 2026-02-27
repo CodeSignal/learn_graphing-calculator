@@ -7,10 +7,49 @@ const ERROR_MESSAGES = {
   empty: 'Expression is empty',
   missingX: 'Expression must include x',
   invalidAssignment: 'Invalid assignment (must be a number)',
-  syntax: 'Syntax error'
+  syntax: 'Syntax error',
+  invalidPointsSyntax: 'Invalid points syntax',
+  invalidVectorSyntax: 'Invalid vector syntax',
+  coordinateAxesNotAllowed: 'Coordinates cannot include x or y'
 };
 
 const INEQUALITY_OPERATORS = ['>=', '<=', '>', '<'];
+
+const clonePlotData = (plotData) => {
+  if (!plotData || typeof plotData !== 'object') {
+    return null;
+  }
+
+  if (plotData.type === 'points' && Array.isArray(plotData.points)) {
+    return {
+      type: 'points',
+      points: plotData.points
+        .filter(point => Array.isArray(point) && point.length === 2)
+        .map(point => [point[0], point[1]])
+    };
+  }
+
+  if (plotData.type === 'vector' && Array.isArray(plotData.vector)) {
+    const vector = plotData.vector.length === 2
+      ? [plotData.vector[0], plotData.vector[1]]
+      : null;
+    const offset = Array.isArray(plotData.offset) && plotData.offset.length === 2
+      ? [plotData.offset[0], plotData.offset[1]]
+      : null;
+
+    if (!vector) {
+      return null;
+    }
+
+    return {
+      type: 'vector',
+      vector,
+      offset
+    };
+  }
+
+  return null;
+};
 
 const cloneResult = (result) => ({
   kind: result.kind,
@@ -21,7 +60,8 @@ const cloneResult = (result) => ({
   usedVariables: Array.isArray(result.usedVariables)
     ? [...result.usedVariables]
     : [],
-  plotExpression: result.plotExpression ?? null
+  plotExpression: result.plotExpression ?? null,
+  plotData: clonePlotData(result.plotData)
 });
 
 const cacheResult = (key, result) => {
@@ -62,6 +102,62 @@ const mapParseError = (errorMessage) => {
     return ERROR_MESSAGES.missingX;
   }
   return ERROR_MESSAGES.syntax;
+};
+
+const validateCoordinateExpression = (coordinateExpression, parser) => {
+  const symbols = parser.getAllSymbols(coordinateExpression);
+
+  if (symbols.includes('x') || symbols.includes('y')) {
+    return {
+      isValid: false,
+      usedVariables: [],
+      error: ERROR_MESSAGES.coordinateAxesNotAllowed
+    };
+  }
+
+  const variables = Array.from(new Set(symbols));
+  const parsed = parser.parse(coordinateExpression, variables);
+  if (!parsed.isValid) {
+    return {
+      isValid: false,
+      usedVariables: [],
+      error: mapParseError(parsed.error)
+    };
+  }
+
+  return {
+    isValid: true,
+    usedVariables: variables,
+    error: null
+  };
+};
+
+const validateCoordinatePairs = (pairs, parser) => {
+  const usedVariables = new Set();
+
+  for (const pair of pairs) {
+    if (!Array.isArray(pair) || pair.length !== 2) {
+      return {
+        isValid: false,
+        usedVariables: [],
+        error: ERROR_MESSAGES.syntax
+      };
+    }
+
+    for (const coordinateExpression of pair) {
+      const validated = validateCoordinateExpression(coordinateExpression, parser);
+      if (!validated.isValid) {
+        return validated;
+      }
+      validated.usedVariables.forEach(symbol => usedVariables.add(symbol));
+    }
+  }
+
+  return {
+    isValid: true,
+    usedVariables: Array.from(usedVariables).sort(),
+    error: null
+  };
 };
 
 const evaluateRHS = (rhsExpression, parser) => {
@@ -211,6 +307,102 @@ export const classifyLine = (expression, parser) => {
       error: null,
       usedVariables: [],
       plotExpression: null
+    };
+    cacheResult(cacheKey, result);
+    return cloneResult(result);
+  }
+
+  const pointsSyntax = parser.parsePointsSyntax(trimmed);
+  if (pointsSyntax.isPoints) {
+    if (pointsSyntax.isMalformed) {
+      result = {
+        kind: 'invalid',
+        graphMode: null,
+        error: pointsSyntax.error || ERROR_MESSAGES.invalidPointsSyntax,
+        usedVariables: [],
+        plotExpression: null,
+        plotData: null
+      };
+      cacheResult(cacheKey, result);
+      return cloneResult(result);
+    }
+
+    const validated = validateCoordinatePairs(pointsSyntax.points, parser);
+    if (!validated.isValid) {
+      result = {
+        kind: 'invalid',
+        graphMode: null,
+        error: validated.error || ERROR_MESSAGES.invalidPointsSyntax,
+        usedVariables: validated.usedVariables || [],
+        plotExpression: null,
+        plotData: null
+      };
+      cacheResult(cacheKey, result);
+      return cloneResult(result);
+    }
+
+    result = {
+      kind: 'graph',
+      graphMode: 'points',
+      error: null,
+      usedVariables: validated.usedVariables,
+      plotExpression: null,
+      plotData: {
+        type: 'points',
+        points: pointsSyntax.points.map(point => [point[0], point[1]])
+      }
+    };
+    cacheResult(cacheKey, result);
+    return cloneResult(result);
+  }
+
+  const vectorSyntax = parser.parseVectorSyntax(trimmed);
+  if (vectorSyntax.isVector) {
+    if (vectorSyntax.isMalformed || !vectorSyntax.vector) {
+      result = {
+        kind: 'invalid',
+        graphMode: null,
+        error: vectorSyntax.error || ERROR_MESSAGES.invalidVectorSyntax,
+        usedVariables: [],
+        plotExpression: null,
+        plotData: null
+      };
+      cacheResult(cacheKey, result);
+      return cloneResult(result);
+    }
+
+    const coordinatePairs = [vectorSyntax.vector];
+    if (vectorSyntax.offset) {
+      coordinatePairs.push(vectorSyntax.offset);
+    }
+
+    const validated = validateCoordinatePairs(coordinatePairs, parser);
+    if (!validated.isValid) {
+      result = {
+        kind: 'invalid',
+        graphMode: null,
+        error: validated.error || ERROR_MESSAGES.invalidVectorSyntax,
+        usedVariables: validated.usedVariables || [],
+        plotExpression: null,
+        plotData: null
+      };
+      cacheResult(cacheKey, result);
+      return cloneResult(result);
+    }
+
+    result = {
+      kind: 'graph',
+      graphMode: 'vector',
+      error: null,
+      usedVariables: validated.usedVariables,
+      plotExpression: null,
+      plotData: {
+        type: 'vector',
+        vector: [vectorSyntax.vector[0], vectorSyntax.vector[1]],
+        offset: vectorSyntax.offset
+          ? [vectorSyntax.offset[0], vectorSyntax.offset[1]]
+          : ['0', '0']
+      }
     };
     cacheResult(cacheKey, result);
     return cloneResult(result);

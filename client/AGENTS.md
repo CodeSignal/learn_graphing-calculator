@@ -80,7 +80,7 @@ styling is a last resort.
   source of truth for line kinds.
 - `state.functions` entries may include derived classification metadata
   (`kind`, `graphMode`, `error`, `paramName`, `value`, `usedVariables`,
-  `plotExpression`) normalized by ExpressionList.
+  `plotExpression`, `plotData`) normalized by ExpressionList.
 - **Single-authority classification**: ExpressionList's `handleFunctionsUpdate`
   is the single authority for classification metadata and UI-specific overrides.
   It classifies all expressions on each `state:changed:functions` event and
@@ -117,6 +117,8 @@ styling is a last resort.
     don't already have assignments
   - Uses debouncing (300ms), but defers detection while a text expression input
     is focused and runs it on `expressions:committed`
+  - Ignores reserved function names (`points`, `vector`) during symbol
+    extraction so they are never treated as parameters
 - ExpressionList creates ParameterSlider instances for assignment expressions.
   ParameterSlider manages the slider UI, settings panel, and parameter config
   normalization. ExpressionList handles expression updates and logging based
@@ -164,10 +166,13 @@ styling is a last resort.
 
 ## Gotchas
 - LineClassifier auto-detects expression type: explicit (`y = f(x)`, `f(x) = expr`,
-  bare `f(x)`), implicit (`x^2 + y^2 = 1`, `x = expr`), inequality (detected,
-  rendering deferred). Users type math; fnType is internal. Function definition
-  syntax (`f(x) = expr`) is treated as explicit; the body becomes `plotExpression`
-  and the function name is ignored (same rendering path as `y = expr`).
+  bare `f(x)`), implicit (`x^2 + y^2 = 1`, `x = expr`), points
+  (`points([[x,y], ...])`), vector (`vector([vx,vy],[ox,oy]?)`), inequality
+  (detected, rendering deferred). Users type math; fnType is internal.
+  Function definition syntax (`f(x) = expr`) is treated as explicit; the body
+  becomes `plotExpression` and the function name is ignored (same rendering
+  path as `y = expr`). Points/vector coordinates may use parameters/constants,
+  but cannot include `x` or `y`.
 - Keep raw expression text in inputs/state. Plot and LaTeX display conversions
   are target-specific and handled by `math/expression-adapter.js`.
 - Assignment lines must be constants (no `x` on the RHS).

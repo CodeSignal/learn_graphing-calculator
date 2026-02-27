@@ -48,4 +48,32 @@ describe('analyzeParameters', () => {
     expect(result.usedParams.has('a')).toBe(true)
     expect(result.missingAssignments).toEqual(['a'])
   })
+
+  it('infers parameters used in points and vector coordinates', () => {
+    const functions = [
+      { expression: 'points([[a, 1], [b + 2, 3]])' },
+      { expression: 'vector([u, v], [0, c])' }
+    ]
+
+    const result = analyzeParameters(functions, parser)
+
+    expect(result.usedParams.has('a')).toBe(true)
+    expect(result.usedParams.has('b')).toBe(true)
+    expect(result.usedParams.has('u')).toBe(true)
+    expect(result.usedParams.has('v')).toBe(true)
+    expect(result.usedParams.has('c')).toBe(true)
+  })
+
+  it('does not infer points/vector function names as parameters', () => {
+    const functions = [
+      { expression: 'points([[1, 2]])' },
+      { expression: 'vector([3, 4])' }
+    ]
+
+    const result = analyzeParameters(functions, parser)
+
+    expect(result.usedParams.has('points')).toBe(false)
+    expect(result.usedParams.has('vector')).toBe(false)
+    expect(result.missingAssignments).toEqual([])
+  })
 })
