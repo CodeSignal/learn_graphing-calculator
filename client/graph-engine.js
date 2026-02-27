@@ -15,6 +15,7 @@ import { DEFAULT_VIEWPORT_BOUNDS } from './core/config-loader.js';
 import FunctionPlotRenderer from './renderers/function-plot-renderer.js';
 
 const VIEWPORT_EPSILON = 1e-9;
+const INEQUALITY_EPSILON = 1e-9;
 
 export default class GraphEngine {
   constructor(containerId) {
@@ -273,7 +274,7 @@ export default class GraphEngine {
 
     const showGrid = graph.showGrid === true;
     const annotations = Array.isArray(graph.annotations) ? graph.annotations : [];
-    const { data, meta } = this.mapFunctionsToPlotData(functions, scope);
+    const { data, meta, inequalities } = this.mapFunctionsToPlotData(functions, scope);
     this.datumMeta = meta;
     const viewportForRender = this.getAspectLockedViewport(this.viewport);
 
@@ -299,12 +300,13 @@ export default class GraphEngine {
       this.needsRebuild = false;
     }
 
-    this.renderer.updateData(data);
+    this.renderer.updateData(data, inequalities);
   }
 
   mapFunctionsToPlotData(functions, scopeValues) {
     const data = [];
     const meta = [];
+    const inequalities = [];
     const scope = { ...scopeValues };
 
     (functions || []).forEach((func) => {
@@ -412,14 +414,101 @@ export default class GraphEngine {
           meta.push({ id: func.id });
           break;
         }
-        case 'inequality':
+        case 'inequality': {
+          const inequalityData = classification.plotData;
+          if (!inequalityData || inequalityData.type !== 'inequality') {
+            break;
+          }
+
+          const boundaryExpression = inequalityData.boundaryExpression;
+          const adaptedBoundary = toFunctionPlotSyntax(boundaryExpression);
+          if (!adaptedBoundary) {
+            break;
+          }
+
+          const boundaryDatum = {
+            fnType: 'implicit',
+            fn: adaptedBoundary,
+            scope: { ...scope },
+            color: func.color,
+            skipTip: true
+          };
+          if (inequalityData.strict) {
+            boundaryDatum.attr = { 'stroke-dasharray': '6,4' };
+          }
+
+          data.push(boundaryDatum);
+          meta.push({ id: func.id });
+
+          const evaluate = this.buildInequalityEvaluator(
+            boundaryExpression,
+            classification.usedVariables,
+            scope,
+            inequalityData
+          );
+          if (!evaluate) {
+            break;
+          }
+
+          inequalities.push({
+            id: func.id,
+            color: func.color,
+            operator: inequalityData.operator,
+            strict: inequalityData.strict === true,
+            satisfiesPositive: inequalityData.satisfiesPositive === true,
+            evaluate
+          });
           break;
+        }
         default:
           break;
       }
     });
 
-    return { data, meta };
+    return { data, meta, inequalities };
+  }
+
+  buildInequalityEvaluator(boundaryExpression, usedVariables, scopeValues, inequalityData) {
+    if (typeof boundaryExpression !== 'string' || !boundaryExpression.trim()) {
+      return null;
+    }
+
+    const parserVariables = Array.from(
+      new Set(['x', 'y', ...(usedVariables || [])])
+    );
+    const parsed = sharedParser.parse(boundaryExpression, parserVariables);
+    if (!parsed.isValid) {
+      return null;
+    }
+
+    const strict = inequalityData.strict === true;
+    const satisfiesPositive = inequalityData.satisfiesPositive === true;
+    const evalScope = { ...(scopeValues || {}), x: 0, y: 0 };
+
+    return (x, y) => {
+      evalScope.x = x;
+      evalScope.y = y;
+      let value;
+      try {
+        value = parsed.evaluate(evalScope);
+      } catch (error) {
+        return false;
+      }
+
+      if (!Number.isFinite(value)) {
+        return false;
+      }
+
+      if (strict) {
+        return satisfiesPositive
+          ? value > INEQUALITY_EPSILON
+          : value < -INEQUALITY_EPSILON;
+      }
+
+      return satisfiesPositive
+        ? value >= -INEQUALITY_EPSILON
+        : value <= INEQUALITY_EPSILON;
+    };
   }
 
   evaluateCoordinateExpression(expression, scopeValues) {

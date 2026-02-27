@@ -274,22 +274,53 @@ describe('LineClassifier', () => {
   })
 
   describe('inequalities', () => {
-    it('classifies y > x^2 as inequality (deferred)', () => {
+    it('classifies y > x^2 with rich inequality metadata', () => {
       const result = classifyLine('y > x^2', parser)
       expect(result.kind).toBe('graph')
       expect(result.graphMode).toBe('inequality')
+      expect(result.plotExpression).toBe('(y) - (x^2)')
+      expect(result.usedVariables).toEqual(['x', 'y'])
+      expect(result.plotData).toEqual({
+        type: 'inequality',
+        operator: '>',
+        lhs: 'y',
+        rhs: 'x^2',
+        boundaryExpression: '(y) - (x^2)',
+        strict: true,
+        satisfiesPositive: true
+      })
     })
 
-    it('classifies x < 3 as inequality', () => {
+    it('classifies x < 3 as strict negative-side inequality', () => {
       const result = classifyLine('x < 3', parser)
       expect(result.kind).toBe('graph')
       expect(result.graphMode).toBe('inequality')
+      expect(result.plotData?.strict).toBe(true)
+      expect(result.plotData?.satisfiesPositive).toBe(false)
+      expect(result.plotExpression).toBe('(x) - (3)')
     })
 
-    it('classifies x^2 + y^2 <= 9 as inequality', () => {
+    it('classifies x^2 + y^2 <= 9 as inclusive inequality', () => {
       const result = classifyLine('x^2 + y^2 <= 9', parser)
       expect(result.kind).toBe('graph')
       expect(result.graphMode).toBe('inequality')
+      expect(result.plotData?.strict).toBe(false)
+      expect(result.plotData?.satisfiesPositive).toBe(false)
+      expect(result.usedVariables).toEqual(['x', 'y'])
+    })
+
+    it('rejects chained inequalities', () => {
+      const result = classifyLine('-1 < x < 1', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.graphMode).toBe(null)
+      expect(result.error).toBe('Chained inequalities are not supported')
+    })
+
+    it('rejects non-graph inequalities that do not include x or y', () => {
+      const result = classifyLine('a < b', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.graphMode).toBe(null)
+      expect(result.error).toBe('Inequality must include x or y')
     })
   })
 })

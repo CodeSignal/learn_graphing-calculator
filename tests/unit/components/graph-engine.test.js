@@ -123,8 +123,8 @@ vi.mock('../../../client/renderers/function-plot-renderer.js', () => ({
       this.rebuildCalls.push(args)
     }
 
-    updateData(data) {
-      this.dataCalls.push(data)
+    updateData(data, inequalities = []) {
+      this.dataCalls.push({ data, inequalities })
     }
 
     destroy() {
@@ -395,14 +395,51 @@ describe('GraphEngine (function-plot migration)', () => {
     expect(vector.data).toHaveLength(0)
   })
 
-  it('skips inequality expressions (rendering deferred)', () => {
+  it('maps inequalities to implicit boundary data and shading descriptors', () => {
     const engine = new GraphEngine('graph-canvas')
 
-    const { data } = engine.mapFunctionsToPlotData([
+    const { data, meta, inequalities } = engine.mapFunctionsToPlotData([
       { id: 'i1', expression: 'y > x^2', color: '#00f', visible: true }
     ], {})
 
-    expect(data).toHaveLength(0)
+    expect(data).toHaveLength(1)
+    expect(meta).toEqual([{ id: 'i1' }])
+    expect(data[0]).toMatchObject({
+      fnType: 'implicit',
+      fn: '(y) - (x^2)',
+      scope: {},
+      color: '#00f',
+      skipTip: true
+    })
+    expect(data[0].attr).toEqual({ 'stroke-dasharray': '6,4' })
+
+    expect(inequalities).toHaveLength(1)
+    expect(inequalities[0]).toMatchObject({
+      id: 'i1',
+      color: '#00f',
+      operator: '>',
+      strict: true,
+      satisfiesPositive: true
+    })
+    expect(inequalities[0].evaluate(2, 6)).toBe(true)
+    expect(inequalities[0].evaluate(2, 2)).toBe(false)
+  })
+
+  it('uses solid boundary for inclusive inequalities', () => {
+    const engine = new GraphEngine('graph-canvas')
+
+    const { data, inequalities } = engine.mapFunctionsToPlotData([
+      { id: 'i2', expression: 'x^2 + y^2 <= 9', color: '#0b8', visible: true }
+    ], {})
+
+    expect(data).toHaveLength(1)
+    expect(data[0].fnType).toBe('implicit')
+    expect(data[0].attr).toBeUndefined()
+    expect(inequalities).toHaveLength(1)
+    expect(inequalities[0].strict).toBe(false)
+    expect(inequalities[0].satisfiesPositive).toBe(false)
+    expect(inequalities[0].evaluate(1, 1)).toBe(true)
+    expect(inequalities[0].evaluate(5, 5)).toBe(false)
   })
 
   it('datumMeta tracks id for each plotted datum in order', () => {
@@ -453,6 +490,26 @@ describe('GraphEngine (function-plot migration)', () => {
     const renderer = rendererInstances[0]
     expect(typeof renderer.lastInitArgs.tipRenderer).toBe('function')
     expect(renderer.lastInitArgs.annotations).toEqual([{ x: 0, text: 'origin' }])
+  })
+
+  it('passes inequalities to renderer updateData during render', () => {
+    mockState.functions = [
+      { id: 'i1', expression: 'y > x^2', color: '#00f', visible: true }
+    ]
+
+    const engine = new GraphEngine('graph-canvas')
+    engine.init()
+    vi.runOnlyPendingTimers()
+
+    const renderer = rendererInstances[0]
+    expect(renderer.dataCalls.length).toBeGreaterThan(0)
+
+    const lastDataCall = renderer.dataCalls[renderer.dataCalls.length - 1]
+    expect(Array.isArray(lastDataCall.data)).toBe(true)
+    expect(Array.isArray(lastDataCall.inequalities)).toBe(true)
+    expect(lastDataCall.inequalities).toHaveLength(1)
+    expect(lastDataCall.inequalities[0].evaluate(2, 5)).toBe(true)
+    expect(lastDataCall.inequalities[0].evaluate(2, 2)).toBe(false)
   })
 
   it('passes annotations on rebuild when graph state changes', () => {

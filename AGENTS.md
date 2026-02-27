@@ -37,7 +37,11 @@ commands, or architecture.
      fnType. Supports: explicit (`y = f(x)`, `f(x) = expr`, bare `f(x)`),
      implicit (e.g. `x^2 + y^2 = 1`, `x = expr`), points
      (`points([[x,y], ...])`), vector (`vector([vx,vy],[ox,oy]?)`), and
-     inequality detection (rendering deferred). Function definition syntax
+     inequalities (`<`, `<=`, `>`, `>=`) with single-comparator validation.
+     Inequalities now emit `plotData` metadata:
+     `{ type: 'inequality', operator, lhs, rhs, boundaryExpression, strict,
+     satisfiesPositive }` and set `plotExpression` to `boundaryExpression`.
+     Chained inequalities (e.g. `-1 < x < 1`) are rejected. Function definition syntax
      (`f(x) = expr`) is treated as explicit with the body as `plotExpression`;
      sole parameter must be `x`. Points/vector coordinates may use parameters
      but cannot include `x` or `y`.
@@ -70,7 +74,9 @@ commands, or architecture.
      `expressions:committed`.
      - `mapFunctionsToPlotData` returns `{ data, meta }` where `meta` is a
        parallel array of `{ id }` entries for each plotted datum (used by
-       `tipRenderer` to show expression ids in tooltips).
+       `tipRenderer` to show expression ids in tooltips). It now also returns
+       `inequalities`, an array of shading descriptors with compiled
+       `evaluate(x, y)` predicates.
      - `tipRenderer(x, y, index)` formats the on-curve tooltip as
        `id: (x, y)` using `datumMeta`.
      - Reads `graph.annotations` from state and passes to renderer on every
@@ -88,6 +94,13 @@ commands, or architecture.
      - For `graphMode: 'vector'`, maps to
        `{ fnType: 'vector', graphType: 'polyline', sampler: 'builtIn', vector, offset }`
        after evaluating coordinate expressions against current parameter scope.
+     - For `graphMode: 'inequality'`, maps boundary curves to implicit datums
+       (`fnType: 'implicit'`) with `skipTip: true`; strict inequalities use a
+       dashed boundary stroke, inclusive inequalities use solid boundaries.
+       Region shading is rendered by `FunctionPlotRenderer` on a custom canvas
+       overlay using the compiled inequality predicates. The renderer caches
+       the latest inequality descriptors and repaints shading during zoom/pan
+       interactions with requestAnimationFrame-coalesced redraws.
 6. **Config**:
    - Primary: `configs/config.json` (loaded first). Fallback:
      `configs/default-config.js` (used when JSON unavailable).

@@ -4,11 +4,16 @@ import FunctionPlotRenderer from '../../../client/renderers/function-plot-render
 const functionPlotMock = vi.fn()
 const chartCache = {}
 let chartCounter = 0
+let canvasContext
+let getContextSpy
 
 function createMockChart(options) {
   const listeners = new Map()
   const xDomain = [...(options.xAxis?.domain || [-10, 10])]
   const yDomain = [...(options.yAxis?.domain || [-10, 10])]
+  const margin = { left: 40, right: 20, top: 20, bottom: 20 }
+  const width = (options.width || 800) - margin.left - margin.right
+  const height = (options.height || 600) - margin.top - margin.bottom
 
   const id = options.id || `chart-${++chartCounter}`
   options.id = id
@@ -16,11 +21,22 @@ function createMockChart(options) {
   const chart = {
     options,
     meta: {
+      width,
+      height,
+      margin,
       xScale: {
-        domain: vi.fn(() => xDomain)
+        domain: vi.fn(() => xDomain),
+        invert: vi.fn((pixel) => {
+          const ratio = width > 0 ? pixel / width : 0
+          return xDomain[0] + (ratio * (xDomain[1] - xDomain[0]))
+        })
       },
       yScale: {
-        domain: vi.fn(() => yDomain)
+        domain: vi.fn(() => yDomain),
+        invert: vi.fn((pixel) => {
+          const ratio = height > 0 ? (height - pixel) / height : 0
+          return yDomain[0] + (ratio * (yDomain[1] - yDomain[0]))
+        })
       }
     },
     on: vi.fn((eventName, handler) => {
@@ -68,6 +84,22 @@ describe('FunctionPlotRenderer', () => {
     container = document.createElement('div')
     container.id = 'graph-canvas'
     document.body.appendChild(container)
+    canvasContext = {
+      setTransform: vi.fn(),
+      clearRect: vi.fn(),
+      save: vi.fn(),
+      beginPath: vi.fn(),
+      rect: vi.fn(),
+      clip: vi.fn(),
+      fillRect: vi.fn(),
+      restore: vi.fn(),
+      fillStyle: '#000000',
+      globalAlpha: 1,
+      imageSmoothingEnabled: true
+    }
+    getContextSpy = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => canvasContext)
 
     chartCounter = 0
     Object.keys(chartCache).forEach((key) => {
@@ -80,6 +112,8 @@ describe('FunctionPlotRenderer', () => {
 
   afterEach(() => {
     document.body.innerHTML = ''
+    getContextSpy.mockRestore()
+    vi.unstubAllGlobals()
     vi.clearAllMocks()
   })
 
@@ -240,13 +274,138 @@ describe('FunctionPlotRenderer', () => {
     const chart = renderer.chart
     chart.draw.mockClear()
     chart.build.mockClear()
+    canvasContext.clearRect.mockClear()
+    canvasContext.fillRect.mockClear()
 
     const nextData = [{ fnType: 'linear', fn: 'x^2' }]
-    renderer.updateData(nextData)
+    renderer.updateData(nextData, [
+      { color: '#f00', evaluate: () => true }
+    ])
 
     expect(chart.options.data).toEqual(nextData)
     expect(chart.draw).toHaveBeenCalledTimes(1)
     expect(chart.build).not.toHaveBeenCalled()
+    expect(canvasContext.clearRect).toHaveBeenCalledTimes(1)
+    expect(canvasContext.fillRect).toHaveBeenCalled()
+  })
+
+  it('re-renders inequality overlay on zoom using cached inequalities', () => {
+    const onZoom = vi.fn()
+    const rafSpy = vi.fn((callback) => {
+      callback()
+      return 1
+    })
+    vi.stubGlobal('requestAnimationFrame', rafSpy)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const renderer = new FunctionPlotRenderer(container)
+    renderer.init({
+      width: 500,
+      height: 400,
+      viewport: { xMin: -10, xMax: 10, yMin: -10, yMax: 10 },
+      showGrid: true,
+      onZoom
+    })
+
+    renderer.updateData([{ fnType: 'linear', fn: 'x' }], [{ evaluate: () => true }])
+
+    canvasContext.clearRect.mockClear()
+    canvasContext.fillRect.mockClear()
+
+    const chart = renderer.chart
+    chart.setDomainsForTest([-4, 4], [-3, 3])
+    chart.emitForTest('zoom')
+
+    expect(onZoom).toHaveBeenCalledWith({ xMin: -4, xMax: 4, yMin: -3, yMax: 3 })
+    expect(rafSpy).toHaveBeenCalledTimes(1)
+    expect(canvasContext.clearRect).toHaveBeenCalledTimes(1)
+    expect(canvasContext.fillRect).toHaveBeenCalled()
+  })
+
+  it('coalesces zoom-triggered inequality redraws to one per animation frame', () => {
+    let scheduledCallback = null
+    const rafSpy = vi.fn((callback) => {
+      scheduledCallback = callback
+      return 7
+    })
+    vi.stubGlobal('requestAnimationFrame', rafSpy)
+    vi.stubGlobal('cancelAnimationFrame', vi.fn())
+
+    const renderer = new FunctionPlotRenderer(container)
+    renderer.init({
+      width: 500,
+      height: 400,
+      viewport: { xMin: -10, xMax: 10, yMin: -10, yMax: 10 },
+      showGrid: true,
+      onZoom: vi.fn()
+    })
+
+    renderer.updateData([{ fnType: 'linear', fn: 'x' }], [{ evaluate: () => true }])
+    canvasContext.clearRect.mockClear()
+    canvasContext.fillRect.mockClear()
+
+    const chart = renderer.chart
+    chart.emitForTest('zoom')
+    chart.emitForTest('zoom')
+    chart.emitForTest('zoom')
+
+    expect(rafSpy).toHaveBeenCalledTimes(1)
+    expect(canvasContext.fillRect).not.toHaveBeenCalled()
+
+    expect(typeof scheduledCallback).toBe('function')
+    scheduledCallback()
+
+    expect(canvasContext.clearRect).toHaveBeenCalledTimes(1)
+    expect(canvasContext.fillRect).toHaveBeenCalled()
+
+    chart.emitForTest('zoom')
+    expect(rafSpy).toHaveBeenCalledTimes(2)
+  })
+
+  it('creates and resizes inequality overlay canvas on init and rebuild', () => {
+    const renderer = new FunctionPlotRenderer(container)
+
+    renderer.init({
+      width: 400,
+      height: 300,
+      viewport: { xMin: -8, xMax: 8, yMin: -6, yMax: 6 },
+      showGrid: true,
+      onZoom: vi.fn()
+    })
+
+    const canvas = container.querySelector('.inequality-overlay-canvas')
+    expect(canvas).toBeTruthy()
+    expect(canvas.style.width).toBe('400px')
+    expect(canvas.style.height).toBe('300px')
+
+    renderer.rebuild({
+      width: 600,
+      height: 420,
+      viewport: { xMin: -4, xMax: 4, yMin: -3, yMax: 3 },
+      showGrid: false
+    })
+
+    expect(canvas.style.width).toBe('600px')
+    expect(canvas.style.height).toBe('420px')
+  })
+
+  it('handles missing canvas context without crashing', () => {
+    getContextSpy.mockImplementationOnce(() => null)
+    const renderer = new FunctionPlotRenderer(container)
+
+    expect(() => {
+      renderer.init({
+        width: 500,
+        height: 400,
+        viewport: { xMin: -10, xMax: 10, yMin: -10, yMax: 10 },
+        showGrid: true,
+        onZoom: vi.fn()
+      })
+    }).not.toThrow()
+
+    expect(() => {
+      renderer.updateData([{ fnType: 'linear', fn: 'x' }], [{ evaluate: () => true }])
+    }).not.toThrow()
   })
 
   it('rebuilds chart when bounds/size/grid change', () => {

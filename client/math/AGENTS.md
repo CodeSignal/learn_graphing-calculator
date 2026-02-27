@@ -22,7 +22,7 @@ alter math behavior.
 3. `line-classifier.js`: Single source of truth for line kinds (`graph`,
    `assignment`, `invalid`, `empty`). Returns `graphMode` for function-plot:
    `explicit`, `implicit`, `points`, `vector`, or `inequality`
-   (rendering deferred). Rules:
+   (rendered by graph/renderer layer). Rules:
    - `y = expr` → `graph`, `graphMode: 'explicit'`
    - `f(x) = expr` (function definition, sole param must be `x`) → `graph`,
      `graphMode: 'explicit'`, `plotExpression: expr` (same as `y = expr`)
@@ -35,7 +35,12 @@ alter math behavior.
      `plotData.vector`/`plotData.offset` (defaults offset to `['0', '0']`)
    - `points`/`vector` coordinates may use parameters/constants but must not use
      `x` or `y`
-   - `>=`, `<=`, `>`, `<` → `graph`, `graphMode: 'inequality'` (deferred)
+   - Single-comparator `>=`, `<=`, `>`, `<` → `graph`,
+     `graphMode: 'inequality'`, `plotExpression: '(lhs) - (rhs)'`, and
+     `plotData: { type: 'inequality', operator, lhs, rhs, boundaryExpression,
+     strict, satisfiesPositive }`
+   - Chained inequalities (e.g. `-1 < x < 1`) → `invalid`
+   - Inequalities without `x` or `y` (e.g. `a < b`) → `invalid`
    - `param = constant` → `assignment`
    - `f(t) = expr` or multi-param `f(x,y) = expr` → `invalid` (non-x parameter)
 4. `parameter-utils.js`: Derives defined/used parameters and missing assignments
@@ -86,7 +91,7 @@ alter math behavior.
 - When modifying math behavior, update/add tests to maintain coverage.
 
 ## Known limitations
-- **Inequality rendering deferred**: Detection is in place; no visual output yet.
+- **Single-comparator inequalities only**: Chained comparisons are rejected.
 - **Parametric expressions**: Not yet supported (`x(t)`, `y(t)`); architecture ready.
 
 ## Documentation rule

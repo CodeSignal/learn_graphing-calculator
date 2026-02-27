@@ -69,11 +69,20 @@ styling is a last resort.
   axis ticks/labels, grid via options, and on-curve tip (crosshairs + tooltip).
   Accepts `tipRenderer` (function) and `annotations` (array) in `init()`;
   `rebuild()` also accepts `annotations` to update reference lines.
+  Inequality region shading is rendered on a custom
+  `.inequality-overlay-canvas` layer (absolute-positioned, pointer-events none)
+  using chart scales/margins after each draw. The renderer caches current
+  inequality descriptors and repaints shading during zoom/pan interactions with
+  requestAnimationFrame-coalesced redraws.
 - GraphEngine enforces equal unit scale on X/Y during render by deriving an
   aspect-locked viewport from the canonical state viewport and current canvas
   size. Policy is fixed to expanding the smaller axis around center (never
   cropping). The canonical viewport in state is not mutated by resize-time
   aspect correction.
+- `mapFunctionsToPlotData` now returns `{ data, meta, inequalities }` where
+  `inequalities` contains shading descriptors with compiled
+  `evaluate(x, y)` functions. GraphEngine passes these to
+  `FunctionPlotRenderer.updateData(data, inequalities)`.
 
 ## Utilities
 - Line classification lives in `math/line-classifier.js` and is the single
@@ -168,7 +177,7 @@ styling is a last resort.
 - LineClassifier auto-detects expression type: explicit (`y = f(x)`, `f(x) = expr`,
   bare `f(x)`), implicit (`x^2 + y^2 = 1`, `x = expr`), points
   (`points([[x,y], ...])`), vector (`vector([vx,vy],[ox,oy]?)`), inequality
-  (detected, rendering deferred). Users type math; fnType is internal.
+  (rendered with boundary + region shading). Users type math; fnType is internal.
   Function definition syntax (`f(x) = expr`) is treated as explicit; the body
   becomes `plotExpression` and the function name is ignored (same rendering
   path as `y = expr`). Points/vector coordinates may use parameters/constants,

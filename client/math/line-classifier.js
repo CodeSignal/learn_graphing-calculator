@@ -10,10 +10,10 @@ const ERROR_MESSAGES = {
   syntax: 'Syntax error',
   invalidPointsSyntax: 'Invalid points syntax',
   invalidVectorSyntax: 'Invalid vector syntax',
-  coordinateAxesNotAllowed: 'Coordinates cannot include x or y'
+  coordinateAxesNotAllowed: 'Coordinates cannot include x or y',
+  chainedInequality: 'Chained inequalities are not supported',
+  inequalityMissingAxis: 'Inequality must include x or y'
 };
-
-const INEQUALITY_OPERATORS = ['>=', '<=', '>', '<'];
 
 const clonePlotData = (plotData) => {
   if (!plotData || typeof plotData !== 'object') {
@@ -45,6 +45,36 @@ const clonePlotData = (plotData) => {
       type: 'vector',
       vector,
       offset
+    };
+  }
+
+  if (plotData.type === 'inequality') {
+    const {
+      operator,
+      lhs,
+      rhs,
+      boundaryExpression,
+      strict,
+      satisfiesPositive
+    } = plotData;
+
+    if (
+      typeof operator !== 'string' ||
+      typeof lhs !== 'string' ||
+      typeof rhs !== 'string' ||
+      typeof boundaryExpression !== 'string'
+    ) {
+      return null;
+    }
+
+    return {
+      type: 'inequality',
+      operator,
+      lhs,
+      rhs,
+      boundaryExpression,
+      strict: strict === true,
+      satisfiesPositive: satisfiesPositive === true
     };
   }
 
@@ -178,15 +208,162 @@ const evaluateRHS = (rhsExpression, parser) => {
   }
 };
 
-const detectInequalityOperator = (str) => {
-  const trimmed = str.trim();
-  for (const op of INEQUALITY_OPERATORS) {
-    const idx = trimmed.indexOf(op);
-    if (idx >= 0) {
-      return { op, idx };
+const detectTopLevelInequalityOperators = (expression) => {
+  const operators = [];
+  let parenDepth = 0;
+  let bracketDepth = 0;
+  let braceDepth = 0;
+
+  for (let index = 0; index < expression.length; index += 1) {
+    const char = expression[index];
+
+    if (char === '(') {
+      parenDepth += 1;
+      continue;
+    }
+    if (char === ')') {
+      parenDepth -= 1;
+      continue;
+    }
+    if (char === '[') {
+      bracketDepth += 1;
+      continue;
+    }
+    if (char === ']') {
+      bracketDepth -= 1;
+      continue;
+    }
+    if (char === '{') {
+      braceDepth += 1;
+      continue;
+    }
+    if (char === '}') {
+      braceDepth -= 1;
+      continue;
+    }
+
+    if (parenDepth !== 0 || bracketDepth !== 0 || braceDepth !== 0) {
+      continue;
+    }
+
+    if (char !== '<' && char !== '>') {
+      continue;
+    }
+
+    const nextChar = expression[index + 1];
+    if (nextChar === '=') {
+      operators.push({
+        op: `${char}=`,
+        idx: index,
+        length: 2
+      });
+      index += 1;
+    } else {
+      operators.push({
+        op: char,
+        idx: index,
+        length: 1
+      });
     }
   }
-  return null;
+
+  return operators;
+};
+
+const tryParseInequality = (trimmed, parser) => {
+  const operators = detectTopLevelInequalityOperators(trimmed);
+  if (operators.length === 0) {
+    return null;
+  }
+
+  if (operators.length > 1) {
+    return {
+      kind: 'invalid',
+      graphMode: null,
+      error: ERROR_MESSAGES.chainedInequality,
+      usedVariables: [],
+      plotExpression: null,
+      plotData: null
+    };
+  }
+
+  const operator = operators[0];
+  const lhs = trimmed.slice(0, operator.idx).trim();
+  const rhs = trimmed.slice(operator.idx + operator.length).trim();
+
+  if (!lhs || !rhs) {
+    return {
+      kind: 'invalid',
+      graphMode: null,
+      error: ERROR_MESSAGES.syntax,
+      usedVariables: [],
+      plotExpression: null,
+      plotData: null
+    };
+  }
+
+  const lhsVariables = parser.getAllSymbols(lhs);
+  const rhsVariables = parser.getAllSymbols(rhs);
+  const allVariables = Array.from(
+    new Set([...lhsVariables, ...rhsVariables])
+  ).sort();
+
+  const parseVariables = buildImplicitVariableList(allVariables);
+  const parsedLhs = parser.parse(lhs, parseVariables);
+  if (!parsedLhs.isValid) {
+    return {
+      kind: 'invalid',
+      graphMode: null,
+      error: mapParseError(parsedLhs.error),
+      usedVariables: allVariables,
+      plotExpression: null,
+      plotData: null
+    };
+  }
+
+  const parsedRhs = parser.parse(rhs, parseVariables);
+  if (!parsedRhs.isValid) {
+    return {
+      kind: 'invalid',
+      graphMode: null,
+      error: mapParseError(parsedRhs.error),
+      usedVariables: allVariables,
+      plotExpression: null,
+      plotData: null
+    };
+  }
+
+  const hasAxisVariable = allVariables.includes('x') || allVariables.includes('y');
+  if (!hasAxisVariable) {
+    return {
+      kind: 'invalid',
+      graphMode: null,
+      error: ERROR_MESSAGES.inequalityMissingAxis,
+      usedVariables: allVariables,
+      plotExpression: null,
+      plotData: null
+    };
+  }
+
+  const boundaryExpression = `(${lhs}) - (${rhs})`;
+  const strict = operator.op === '<' || operator.op === '>';
+
+  return {
+    kind: 'graph',
+    graphMode: 'inequality',
+    error: null,
+    usedVariables: allVariables,
+    plotExpression: boundaryExpression,
+    plotData: {
+      type: 'inequality',
+      operator: operator.op,
+      lhs,
+      rhs,
+      boundaryExpression,
+      strict,
+      satisfiesPositive: operator.op === '>' || operator.op === '>='
+    }
+  };
 };
 
 const tryParseImplicitEquation = (trimmed, parser) => {
@@ -299,15 +476,9 @@ export const classifyLine = (expression, parser) => {
 
   let result;
 
-  const inequalityOp = detectInequalityOperator(trimmed);
-  if (inequalityOp) {
-    result = {
-      kind: 'graph',
-      graphMode: 'inequality',
-      error: null,
-      usedVariables: [],
-      plotExpression: null
-    };
+  const inequality = tryParseInequality(trimmed, parser);
+  if (inequality) {
+    result = inequality;
     cacheResult(cacheKey, result);
     return cloneResult(result);
   }
