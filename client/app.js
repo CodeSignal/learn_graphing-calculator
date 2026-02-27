@@ -11,6 +11,7 @@ import GraphEngine from './graph-engine.js';
 import SidebarManager from './components/sidebar-manager.js';
 import ExpressionList from './components/expression-list.js';
 import Logger from './utils/logger.js';
+import { renderLatex } from './utils/math-formatter.js';
 
 
 class App {
@@ -100,10 +101,68 @@ class App {
     this.expressionList = new ExpressionList('expression-list', 'btn-add-expression');
     this.expressionList.init();
 
-
+    // Sidebar tabs
+    this.initSidebarTabs();
 
     // Global Buttons
     this.initGlobalControls();
+  }
+
+  /**
+   * Initialize sidebar tab controls for expressions/parameters sections
+   */
+  initSidebarTabs() {
+    const expressionTab = document.getElementById('tab-expressions');
+    const parameterTab = document.getElementById('tab-parameters');
+    const expressionLabel = expressionTab?.querySelector('.sidebar-tab-label');
+    const parameterLabel = parameterTab?.querySelector('.sidebar-tab-label');
+
+    if (!expressionTab || !parameterTab || !this.expressionList) {
+      return;
+    }
+
+    this.renderSidebarTabLabels(expressionLabel, parameterLabel);
+
+    const setActiveTab = (section) => {
+      const isExpressions = section === 'expressions';
+
+      expressionTab.classList.toggle('is-active', isExpressions);
+      expressionTab.classList.toggle('button-secondary', isExpressions);
+      expressionTab.classList.toggle('button-tertiary', !isExpressions);
+      expressionTab.setAttribute('aria-selected', isExpressions ? 'true' : 'false');
+
+      parameterTab.classList.toggle('is-active', !isExpressions);
+      parameterTab.classList.toggle('button-secondary', !isExpressions);
+      parameterTab.classList.toggle('button-tertiary', isExpressions);
+      parameterTab.setAttribute('aria-selected', isExpressions ? 'false' : 'true');
+
+      this.expressionList.setActiveSection(section);
+    };
+
+    expressionTab.addEventListener('click', () => {
+      setActiveTab('expressions');
+    });
+
+    parameterTab.addEventListener('click', () => {
+      setActiveTab('parameters');
+    });
+
+    // Default section on every load
+    setActiveTab('expressions');
+  }
+
+  /**
+   * Render math symbols for sidebar tabs using KaTeX
+   * @param {HTMLElement|null} expressionLabel - Expressions tab label host
+   * @param {HTMLElement|null} parameterLabel - Parameters tab label host
+   */
+  renderSidebarTabLabels(expressionLabel, parameterLabel) {
+    if (expressionLabel) {
+      renderLatex('f(x)', expressionLabel);
+    }
+    if (parameterLabel) {
+      renderLatex('\\theta', parameterLabel);
+    }
   }
 
   /**

@@ -44,11 +44,15 @@ commands, or architecture.
    - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX, delegated to
      `math/expression-adapter.js` for expression-to-LaTeX conversion).
 5. **UI components**:
-   - `components/expression-list.js` manages expressions (updates go through
+  - `components/expression-list.js` manages expressions (updates go through
      `StateManager.set('functions', ...)` which fires
      `state:changed:functions`). On blur/Enter commit it publishes
-     `expressions:committed`.
-   - `components/sidebar-manager.js` handles resize/toggle.
+     `expressions:committed`. Sidebar rows are split into tabbed sections:
+     `f(x)` (graph expressions) and `θ` (parameter assignments), with tab labels
+     rendered through KaTeX. Assignment-intent rows render only in the `θ` tab;
+     graph rows render only in `f(x)`. The bottom CTA is contextual:
+     `+ Add Expression` in `f(x)` and `+ Add Parameter` in `θ`.
+  - `components/sidebar-manager.js` handles resize/toggle.
    - `graph-engine.js` orchestrates render updates and delegates chart drawing
      to `renderers/function-plot-renderer.js`. Plot display uses function-plot
      natives: axis ticks/labels, grid toggle via options, on-curve tip.
@@ -117,7 +121,13 @@ commands, or architecture.
   `EventBus.publish('parameters:updated', {...})` so GraphEngine re-renders.
 - **Expressions**: LineClassifier defines line kinds; GraphEngine backfills
   parameter assignments for any extra symbols detected in graph lines (excluding
-  x/y). Assignment lines never plot. Avoid loops when adding detection paths.
+  x/y). Assignment lines never plot. In the sidebar, assignment-intent rows live
+  in the `θ` tab and are hidden from `f(x)`. `+ Add Parameter` opens an inline
+  name composer in the `θ` tab; names must match `[A-Za-z_][A-Za-z0-9_]*`,
+  cannot be `x`/`y`, and cannot duplicate existing assignment names. Avoid loops
+  when adding detection paths.
+  The inline composer's show/hide behavior relies on native `hidden` plus an
+  explicit `.expression-parameter-composer[hidden]` CSS rule.
 - **Expression adaptation**: Before passing `plotExpression` to function-plot,
   GraphEngine must call `toFunctionPlotSyntax()` from
   `math/expression-adapter.js` to normalize `pi/e/ln` aliases without mutating
@@ -167,8 +177,9 @@ commands, or architecture.
   `npm run test` or `npm run test:run`. Use Vitest; tests live under `tests/`
   (and may also exist under `client/`).
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
-  add/edit expressions, confirm plot redraws, sliders appear for parameters
-  (e.g., `a*sin(b*x)`), zoom/pan, help modal opens.
+  add/edit expressions, confirm plot redraws, switch between `f(x)` and `θ`
+  tabs, verify sliders appear in `θ` for parameters (e.g., `a*sin(b*x)`),
+  zoom/pan, help modal opens.
 - **Prod sanity**: `npm run build && npm run start:prod`, hit
   `http://localhost:3000`, ensure assets load from `dist/`.
 - When introducing risky math/engine changes, add/update automated tests to

@@ -23,6 +23,11 @@ export default class ExpressionList {
         this.unsubscribers = [];
         this.debug = false;
         this.parser = sharedParser;
+        this.activeSection = 'expressions';
+        this.emptyStateClass = 'expression-empty-state';
+        this.addExpressionLabel = '+ Add Expression';
+        this.addParameterLabel = '+ Add Parameter';
+        this.parameterComposer = null;
     }
 
     init() {
@@ -40,7 +45,7 @@ export default class ExpressionList {
 
         // Bind Add Button
         this.addButton.addEventListener('click', () => {
-            this.addExpression();
+            this.handlePrimaryAction();
         });
 
         // Subscribe to parameter changes to update slider values if changed externally
@@ -74,25 +79,7 @@ export default class ExpressionList {
             }
         }
 
-        // 2. Handle empty state
-        if (functions.length === 0) {
-            if (this.renderedItems.size === 0) {
-                this.container.innerHTML =
-                    '<div style="padding: 1rem; color: var(--color-text-weak);">' +
-                    'No expressions added</div>';
-                // Ensure button is still visible after clearing innerHTML
-                this.ensureButtonPosition();
-            }
-            return;
-        }
-
-        // Remove empty state message if present
-        const emptyMsg = this.container.querySelector('div:not(.expression-item)');
-        if (emptyMsg?.textContent.includes('No expressions')) {
-            emptyMsg.remove();
-        }
-
-        // 3. Update or create items
+        // 2. Update or create items
         functions.forEach((func, index) => {
             if (this.renderedItems.has(func.id)) {
                 this.updateItem(func);
@@ -101,11 +88,14 @@ export default class ExpressionList {
             }
         });
 
-        // 4. Reorder items to match function order
+        // 3. Reorder items to match function order
         this.reorderItems(functions);
 
-        // 5. Ensure add button is always at the end
+        // 4. Ensure add button is always at the end
         this.ensureButtonPosition();
+
+        // 5. Filter items by active sidebar tab
+        this.applySectionFilter();
     }
 
     getClassificationMetadata(expression, classificationOverride = null) {
@@ -244,6 +234,8 @@ export default class ExpressionList {
         const expression = item.inputEl.value;
         item.lastExpression = expression;
         this.updateLatexDisplay(item, expression);
+        this.updateItemSection(item, expression);
+        this.applySectionFilter();
     }
 
     /**
@@ -383,9 +375,12 @@ export default class ExpressionList {
             lastColor: func.color,
             isEditing: !func.expression || func.expression.trim() === '',
             lastExpression: func.expression,
+            section: this.resolveSectionForExpression(func.expression),
             // Track expression at edit start for commit-boundary logging
             editStartExpression: undefined
         };
+
+        item.dataset.section = itemData.section;
 
         // Capture starting expression for new empty expressions that start in edit mode
         if (itemData.isEditing) {
@@ -443,6 +438,8 @@ export default class ExpressionList {
 
         // Handle slider lifecycle
         this.reconcileSlider(func, item);
+
+        this.updateItemSection(item, func.expression);
     }
 
 
@@ -622,7 +619,7 @@ export default class ExpressionList {
         }
 
         // Update slider if config changed externally
-        const paramConfig = StateManager.get(`parameters.${paramName}`) || {};
+        const paramConfig = { ...(StateManager.get(`parameters.${paramName}`) || {}) };
         if (paramConfig.value === undefined) {
             paramConfig.value = value;
         }
@@ -687,11 +684,136 @@ export default class ExpressionList {
     ensureButtonPosition() {
         if (!this.addButton || !this.container) return;
 
-        // If button is not the last child, move it to the end
-        const lastChild = this.container.lastElementChild;
-        if (lastChild !== this.addButton) {
+        if (this.parameterComposer?.element?.parentNode === this.container) {
+            this.container.appendChild(this.parameterComposer.element);
+        }
+
+        if (this.container.lastElementChild !== this.addButton) {
             this.container.appendChild(this.addButton);
         }
+    }
+
+    /**
+     * Set active sidebar section and refresh visibility
+     * @param {'expressions'|'parameters'} section - Section to display
+     */
+    setActiveSection(section) {
+        if (section !== 'expressions' && section !== 'parameters') {
+            return;
+        }
+
+        this.activeSection = section;
+        if (section !== 'parameters') {
+            this.closeParameterComposer();
+        }
+        this.applySectionFilter();
+    }
+
+    /**
+     * Decide sidebar section for an expression
+     * @param {string} expression - Expression text
+     * @param {'expressions'|'parameters'|null} currentSection - Existing item section
+     * @param {boolean} isEditing - Whether item is currently being edited
+     * @returns {'expressions'|'parameters'} Resolved section
+     */
+    resolveSectionForExpression(expression, currentSection = null, isEditing = false) {
+        if (isEditing && currentSection) {
+            return currentSection;
+        }
+
+        const trimmed = (expression || '').trim();
+        if (!trimmed) {
+            return 'expressions';
+        }
+
+        const syntax = this.parser.parseAssignmentSyntax(trimmed);
+        if (syntax.isAssignment) {
+            const lhs = syntax.lhs;
+            if (lhs && lhs !== 'x' && lhs !== 'y') {
+                return 'parameters';
+            }
+        }
+
+        const assignmentIntent = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=/);
+        if (assignmentIntent) {
+            const lhs = assignmentIntent[1];
+            if (lhs !== 'x' && lhs !== 'y') {
+                return 'parameters';
+            }
+        }
+
+        return 'expressions';
+    }
+
+    /**
+     * Recompute and persist an item's section
+     * @param {Object} item - Item data from renderedItems
+     * @param {string} expression - Expression to classify
+     */
+    updateItemSection(item, expression) {
+        const nextSection = this.resolveSectionForExpression(
+            expression,
+            item.section,
+            item.isEditing
+        );
+
+        if (nextSection !== item.section) {
+            item.section = nextSection;
+            item.element.dataset.section = nextSection;
+        }
+    }
+
+    /**
+     * Apply section filter and refresh empty state/add button visibility
+     */
+    applySectionFilter() {
+        let visibleItems = 0;
+
+        this.renderedItems.forEach((item) => {
+            const isVisible = item.section === this.activeSection;
+            item.element.hidden = !isVisible;
+            if (isVisible) {
+                visibleItems++;
+            }
+        });
+
+        this.updatePrimaryActionButton();
+        this.updateParameterComposerVisibility();
+
+        this.updateEmptyState(visibleItems);
+    }
+
+    /**
+     * Render or remove section empty state
+     * @param {number} visibleItems - Count of items visible in current section
+     */
+    updateEmptyState(visibleItems) {
+        if (!this.container) return;
+
+        let emptyState = this.container.querySelector(`.${this.emptyStateClass}`);
+
+        if (visibleItems > 0) {
+            if (emptyState) {
+                emptyState.remove();
+            }
+            return;
+        }
+
+        const message = this.activeSection === 'expressions'
+            ? 'No expressions added'
+            : 'No parameters yet';
+
+        if (!emptyState) {
+            emptyState = document.createElement('div');
+            emptyState.className = this.emptyStateClass;
+            if (this.addButton && this.addButton.parentNode === this.container) {
+                this.container.insertBefore(emptyState, this.addButton);
+            } else {
+                this.container.appendChild(emptyState);
+            }
+        }
+
+        emptyState.textContent = message;
     }
 
     /**
@@ -757,6 +879,207 @@ export default class ExpressionList {
             .filter(n => !isNaN(n));
         const nextNum = exprNumbers.length > 0 ? Math.max(...exprNumbers) + 1 : 1;
         return `expr_${nextNum}`;
+    }
+
+    /**
+     * Generate assignment ID for a parameter expression
+     * @param {string} paramName - Parameter name
+     * @param {Array} existingFunctions - Current functions array
+     * @returns {string} Available assignment ID
+     * @private
+     */
+    _generateAssignmentId(paramName, existingFunctions) {
+        const baseId = `param_${paramName}`;
+        const ids = new Set(existingFunctions.map((f) => f.id));
+
+        if (!ids.has(baseId)) {
+            return baseId;
+        }
+
+        let counter = 2;
+        let candidateId = `${baseId}_${counter}`;
+
+        while (ids.has(candidateId)) {
+            counter += 1;
+            candidateId = `${baseId}_${counter}`;
+        }
+
+        return candidateId;
+    }
+
+    /**
+     * Validate user-provided parameter name
+     * @param {string} name - Parameter name candidate
+     * @param {Array} functions - Current functions array
+     * @returns {{valid: boolean, message: string|null}}
+     */
+    validateParameterName(name, functions) {
+        if (!name) {
+            return { valid: false, message: 'Parameter name is required' };
+        }
+
+        if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(name)) {
+            return {
+                valid: false,
+                message: 'Use letters, numbers, or _, and start with a letter or _'
+            };
+        }
+
+        if (name === 'x' || name === 'y') {
+            return { valid: false, message: 'x and y are reserved graph axes' };
+        }
+
+        const hasDuplicateAssignment = functions.some((func) => {
+            const syntax = this.parser.parseAssignmentSyntax(func.expression || '');
+            return syntax.isAssignment && syntax.lhs === name;
+        });
+
+        if (hasDuplicateAssignment) {
+            return { valid: false, message: `Parameter "${name}" already exists` };
+        }
+
+        return { valid: true, message: null };
+    }
+
+    handlePrimaryAction() {
+        if (this.activeSection === 'parameters') {
+            this.openParameterComposer();
+            return;
+        }
+
+        this.addExpression();
+    }
+
+    updatePrimaryActionButton() {
+        if (!this.addButton) return;
+
+        const isParameters = this.activeSection === 'parameters';
+        this.addButton.textContent = isParameters
+            ? this.addParameterLabel
+            : this.addExpressionLabel;
+        this.addButton.title = isParameters
+            ? 'Add parameter'
+            : 'Add expression';
+        this.addButton.setAttribute(
+            'aria-label',
+            isParameters ? 'Add parameter' : 'Add expression'
+        );
+    }
+
+    ensureParameterComposer() {
+        if (this.parameterComposer || !this.container || !this.addButton) {
+            return;
+        }
+
+        const composer = document.createElement('div');
+        composer.className = 'expression-parameter-composer';
+        composer.hidden = true;
+        composer.innerHTML = `
+            <input
+                type="text"
+                class="input expression-parameter-input"
+                placeholder="Parameter name (e.g., a, rate, theta)">
+            <div class="expression-parameter-error" aria-live="polite"></div>
+            <div class="expression-parameter-composer-actions">
+                <button type="button" class="button button-primary button-small">
+                    Create
+                </button>
+                <button type="button" class="button button-secondary button-small">
+                    Cancel
+                </button>
+            </div>
+        `;
+
+        const input = composer.querySelector('.expression-parameter-input');
+        const createBtn = composer.querySelector('.button-primary');
+        const cancelBtn = composer.querySelector('.button-secondary');
+
+        createBtn.addEventListener('click', () => {
+            this.createParameterFromComposer();
+        });
+
+        cancelBtn.addEventListener('click', () => {
+            this.closeParameterComposer();
+        });
+
+        input.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                this.createParameterFromComposer();
+            } else if (event.key === 'Escape') {
+                event.preventDefault();
+                this.closeParameterComposer();
+            }
+        });
+
+        this.parameterComposer = {
+            element: composer,
+            inputEl: input,
+            errorEl: composer.querySelector('.expression-parameter-error')
+        };
+
+        this.container.insertBefore(composer, this.addButton);
+    }
+
+    openParameterComposer() {
+        if (this.activeSection !== 'parameters') {
+            return;
+        }
+
+        this.ensureParameterComposer();
+        if (!this.parameterComposer) return;
+
+        this.parameterComposer.element.hidden = false;
+        this.parameterComposer.inputEl.value = '';
+        this.parameterComposer.errorEl.textContent = '';
+        this.parameterComposer.inputEl.focus();
+    }
+
+    closeParameterComposer() {
+        if (!this.parameterComposer) return;
+
+        this.parameterComposer.element.hidden = true;
+        this.parameterComposer.inputEl.value = '';
+        this.parameterComposer.errorEl.textContent = '';
+    }
+
+    updateParameterComposerVisibility() {
+        if (!this.parameterComposer) return;
+
+        if (this.activeSection !== 'parameters') {
+            this.closeParameterComposer();
+        }
+    }
+
+    createParameterFromComposer() {
+        if (!this.parameterComposer) return;
+
+        const functions = StateManager.get('functions') || [];
+        const rawName = this.parameterComposer.inputEl.value.trim();
+        const validation = this.validateParameterName(rawName, functions);
+
+        if (!validation.valid) {
+            this.parameterComposer.errorEl.textContent = validation.message;
+            this.parameterComposer.inputEl.focus();
+            return;
+        }
+
+        const newId = this._generateAssignmentId(rawName, functions);
+        const nextColor = getColorForIndex(functions.length);
+        const defaultVal = this._formatValueForDisplay(
+            DEFAULT_PARAMETER.value,
+            DEFAULT_PARAMETER.step
+        );
+        const newFunc = {
+            id: newId,
+            expression: `${rawName} = ${defaultVal}`,
+            color: nextColor,
+            visible: true
+        };
+
+        this.logCreated(newId);
+        StateManager.set('functions', [...functions, newFunc]);
+        this.closeParameterComposer();
     }
 
     addExpression() {
@@ -855,6 +1178,7 @@ export default class ExpressionList {
             }
         });
         this.renderedItems.clear();
+        this.parameterComposer = null;
 
         // Clear container
         if (this.container) {

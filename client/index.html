@@ -50,6 +50,28 @@
     <aside id="sidebar" class="sidebar" style="width: 300px;">
       <!-- Sidebar Header -->
       <header class="sidebar-header">
+        <div class="sidebar-tabs" role="tablist" aria-label="Sidebar sections">
+          <button
+            id="tab-expressions"
+            class="button button-secondary sidebar-tab is-active"
+            type="button"
+            role="tab"
+            aria-label="Expressions"
+            aria-selected="true"
+            title="Expressions">
+            <span class="sidebar-tab-label" data-fallback="f(x)">f(x)</span>
+          </button>
+          <button
+            id="tab-parameters"
+            class="button button-tertiary sidebar-tab"
+            type="button"
+            role="tab"
+            aria-label="Parameters"
+            aria-selected="false"
+            title="Parameters">
+            <span class="sidebar-tab-label" data-fallback="θ">θ</span>
+          </button>
+        </div>
         <button
           id="btn-toggle-sidebar"
           class="button button-secondary sidebar-toggle-btn"

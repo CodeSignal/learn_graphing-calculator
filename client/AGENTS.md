@@ -5,8 +5,10 @@ styling is a last resort.
 
 ## Layout & entry points
 1. `index.html`: Declares the DS styles, base layout (header, sidebar, graph
-   area), and loads `app.js`. Keep placeholders minimal; app-specific changes
-   belong in JS/CSS, not duplicated HTML.
+   area), and loads `app.js`. Sidebar header includes DS button tabs with
+   symbol-only labels: `f(x)` for expressions and `θ` for parameters; labels are
+   rendered via KaTeX at runtime. Keep placeholders minimal; app-specific
+   changes belong in JS/CSS, not duplicated HTML.
 2. `app.js`: Bootstraps StateManager, GraphEngine, sidebar components, help
    modal. It is the only place that should instantiate the app; do not spin up
    parallel apps.
@@ -47,7 +49,14 @@ styling is a last resort.
   in the sidebar. Handles expression rendering, LaTeX display, input mode
   switching, visibility toggling, deletion, reordering, and auto-conversion of
   bare parameters to assignments. Publishes `expressions:committed` at text
-  commit boundaries (blur/Enter). Delegates slider functionality to
+  commit boundaries (blur/Enter). Maintains `activeSection` filtering:
+  `expressions` tab shows graph rows, `parameters` tab shows assignment-intent
+  rows. While editing, rows stay in their current tab and only re-group on
+  commit. Owns the contextual primary CTA and inline parameter composer:
+  `+ Add Expression` in expressions, `+ Add Parameter` in parameters. Composer
+  validates names (`[A-Za-z_][A-Za-z0-9_]*`), rejects `x`/`y` and duplicate
+  assignment names, then creates `${name} = 1.0` rows with semantic ids
+  (`param_${name}`, suffixed on collision). Delegates slider functionality to
   ParameterSlider.
 - `components/parameter-slider.js`: Manages parameter slider UI for assignment
   expressions (e.g., `a = 1.0`). Owns slider DOM structure, wraps
@@ -111,7 +120,14 @@ styling is a last resort.
 - ExpressionList creates ParameterSlider instances for assignment expressions.
   ParameterSlider manages the slider UI, settings panel, and parameter config
   normalization. ExpressionList handles expression updates and logging based
-  on ParameterSlider's onChange callbacks.
+  on ParameterSlider's onChange callbacks. Assignment rows are rendered in the
+  `θ` tab only.
+- Primary CTA is contextual by tab:
+  - `f(x)`: `+ Add Expression`
+  - `θ`: `+ Add Parameter` (opens inline composer)
+- Composer visibility is controlled by the native `hidden` attribute; keep
+  `.expression-parameter-composer[hidden] { display: none; }` in app CSS so
+  author styles do not accidentally override hidden state.
 - When you add a new UI control, either predefine it in config or ensure
   GraphEngine's variable detection handles it without render loops.
 
