@@ -10,7 +10,7 @@ import { classifyLine } from './math/line-classifier.js';
 import { analyzeParameters } from './math/parameter-utils.js';
 import { DEFAULT_PARAMETER } from './math/parameter-defaults.js';
 import { toFunctionPlotSyntax, computeDerivative } from './math/expression-adapter.js';
-import { COLORS } from './utils/color-constants.js';
+import { getColorForIndex } from './utils/color-constants.js';
 import { DEFAULT_VIEWPORT_BOUNDS } from './core/config-loader.js';
 import FunctionPlotRenderer from './renderers/function-plot-renderer.js';
 
@@ -494,7 +494,7 @@ export default class GraphEngine {
         const allFunctions = [...existingFunctions, ...functionsToAdd];
         const newId = this._generateAssignmentId(paramName, allFunctions);
         const currentFunctionCount = existingFunctions.length + functionsToAdd.length;
-        const nextColor = COLORS[currentFunctionCount % COLORS.length];
+        const nextColor = getColorForIndex(currentFunctionCount);
         const currentValue = parameters?.[paramName]?.value ?? DEFAULT_PARAMETER.value;
 
         functionsToAdd.push({

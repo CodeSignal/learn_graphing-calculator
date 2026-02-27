@@ -16,7 +16,7 @@
  */
 
 import EventBus from './event-bus.js';
-import { COLORS } from '../utils/color-constants.js';
+import { getColorForIndex } from '../utils/color-constants.js';
 
 /**
  * Default viewport bounds used throughout the application
@@ -233,7 +233,7 @@ class ConfigLoaderClass {
    * @private
    */
   _getDefaultColor(index) {
-    return COLORS[index % COLORS.length];
+    return getColorForIndex(index);
   }
 
   /**

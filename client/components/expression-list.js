@@ -11,7 +11,7 @@ import { classifyLine } from '../math/line-classifier.js';
 import { DEFAULT_PARAMETER } from '../math/parameter-defaults.js';
 import { toLatex, renderLatex } from '../utils/math-formatter.js';
 import Logger from '../utils/logger.js';
-import { COLORS } from '../utils/color-constants.js';
+import { getColorForIndex } from '../utils/color-constants.js';
 
 export default class ExpressionList {
     constructor(containerId, addButtonId) {
@@ -762,8 +762,7 @@ export default class ExpressionList {
     addExpression() {
         const currentFunctions = StateManager.get('functions') || [];
         const newId = this._generateExpressionId(currentFunctions);
-        // Simple color cycle
-        const nextColor = COLORS[currentFunctions.length % COLORS.length];
+        const nextColor = getColorForIndex(currentFunctions.length);
 
         const newFunc = {
             id: newId,
