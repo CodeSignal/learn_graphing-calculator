@@ -47,7 +47,13 @@ minimal and documented.
   with clear reason and update root AGENTS.
 
 ## When adding features
-- New schema fields → extend `ConfigLoader._applyDefaults()`.
+- New schema fields → extend `ConfigLoader._applyDefaults()` and `validate()`.
+- `graph.annotations` array is now a first-class schema field: validated
+  (each entry must have `x` or `y`; both numeric; `text` optional string),
+  defaults to `[]`.
+- Function entries support optional `derivative` (object) and `secants` (array)
+  fields; `_applyDefaults` normalizes them (strips non-object derivatives,
+  strips secant entries missing numeric `x0`).
 - If you add schema fields, document them here and in root AGENTS.
 
 ## Documentation rule

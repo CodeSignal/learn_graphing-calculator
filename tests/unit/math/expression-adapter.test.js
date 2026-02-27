@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  computeDerivative,
   toDisplayLatex,
   toFunctionPlotSyntax
 } from '../../../client/math/expression-adapter.js'
@@ -25,6 +26,36 @@ describe('ExpressionAdapter', () => {
 
     it('returns original expression when parsing fails', () => {
       expect(toFunctionPlotSyntax('x +')).toBe('x +')
+    })
+  })
+
+  describe('computeDerivative', () => {
+    it('returns a function-plot-ready derivative of a polynomial', () => {
+      const result = computeDerivative('x^2')
+      expect(result).toBeTruthy()
+      expect(result).toMatch(/2.*x|x.*2/)
+    })
+
+    it('applies toFunctionPlotSyntax to the result (pi -> PI)', () => {
+      const result = computeDerivative('pi * x')
+      expect(result).toBeTruthy()
+      expect(result).toContain('PI')
+    })
+
+    it('returns null for un-differentiable expressions', () => {
+      expect(computeDerivative('x +')).toBeNull()
+    })
+
+    it('returns null for empty or non-string input', () => {
+      expect(computeDerivative('')).toBeNull()
+      expect(computeDerivative(null)).toBeNull()
+      expect(computeDerivative(42)).toBeNull()
+    })
+
+    it('caches repeated calls for the same expression', () => {
+      const first = computeDerivative('x^3')
+      const second = computeDerivative('x^3')
+      expect(first).toBe(second)
     })
   })
 

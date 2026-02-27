@@ -114,6 +114,118 @@ describe('FunctionPlotRenderer', () => {
     expect(onZoom).toHaveBeenCalledWith({ xMin: -4, xMax: 4, yMin: -2, yMax: 2 })
   })
 
+  it('wires custom tipRenderer into tip options when provided', () => {
+    const renderer = new FunctionPlotRenderer(container)
+    const tipRenderer = vi.fn((x, y) => `(${x}, ${y})`)
+
+    renderer.init({
+      width: 640,
+      height: 360,
+      viewport: { xMin: -5, xMax: 5, yMin: -3, yMax: 3 },
+      showGrid: true,
+      onZoom: vi.fn(),
+      tipRenderer
+    })
+
+    const initOptions = functionPlotMock.mock.calls[0][0]
+    expect(initOptions.tip.renderer).toBe(tipRenderer)
+    expect(initOptions.tip.xLine).toBe(true)
+    expect(initOptions.tip.yLine).toBe(true)
+  })
+
+  it('omits tip.renderer when tipRenderer is not a function', () => {
+    const renderer = new FunctionPlotRenderer(container)
+
+    renderer.init({
+      width: 640,
+      height: 360,
+      viewport: { xMin: -5, xMax: 5, yMin: -3, yMax: 3 },
+      showGrid: true,
+      onZoom: vi.fn()
+    })
+
+    const initOptions = functionPlotMock.mock.calls[0][0]
+    expect(initOptions.tip).not.toHaveProperty('renderer')
+  })
+
+  it('sets annotations from init options', () => {
+    const renderer = new FunctionPlotRenderer(container)
+    const annotations = [{ x: 0, text: 'y-axis' }, { y: 0, text: 'x-axis' }]
+
+    renderer.init({
+      width: 640,
+      height: 360,
+      viewport: { xMin: -5, xMax: 5, yMin: -3, yMax: 3 },
+      showGrid: true,
+      onZoom: vi.fn(),
+      annotations
+    })
+
+    const initOptions = functionPlotMock.mock.calls[0][0]
+    expect(initOptions.annotations).toEqual(annotations)
+  })
+
+  it('defaults annotations to empty array when not provided', () => {
+    const renderer = new FunctionPlotRenderer(container)
+
+    renderer.init({
+      width: 640,
+      height: 360,
+      viewport: { xMin: -5, xMax: 5, yMin: -3, yMax: 3 },
+      showGrid: true,
+      onZoom: vi.fn()
+    })
+
+    const initOptions = functionPlotMock.mock.calls[0][0]
+    expect(initOptions.annotations).toEqual([])
+  })
+
+  it('updates annotations on rebuild', () => {
+    const renderer = new FunctionPlotRenderer(container)
+
+    renderer.init({
+      width: 400,
+      height: 300,
+      viewport: { xMin: -8, xMax: 8, yMin: -6, yMax: 6 },
+      showGrid: true,
+      onZoom: vi.fn()
+    })
+
+    const newAnnotations = [{ x: 2, text: 'x=2' }]
+    renderer.rebuild({
+      width: 400,
+      height: 300,
+      viewport: { xMin: -8, xMax: 8, yMin: -6, yMax: 6 },
+      showGrid: true,
+      annotations: newAnnotations
+    })
+
+    expect(renderer.options.annotations).toEqual(newAnnotations)
+  })
+
+  it('preserves existing annotations on rebuild when none provided', () => {
+    const renderer = new FunctionPlotRenderer(container)
+    const annotations = [{ y: 1, text: 'y=1' }]
+
+    renderer.init({
+      width: 400,
+      height: 300,
+      viewport: { xMin: -8, xMax: 8, yMin: -6, yMax: 6 },
+      showGrid: true,
+      onZoom: vi.fn(),
+      annotations
+    })
+
+    renderer.rebuild({
+      width: 400,
+      height: 300,
+      viewport: { xMin: -4, xMax: 4, yMin: -3, yMax: 3 },
+      showGrid: true
+    })
+
+    expect(renderer.options.annotations).toEqual(annotations)
+  })
+
   it('updates data through draw without rebuilding', () => {
     const renderer = new FunctionPlotRenderer(container)
 

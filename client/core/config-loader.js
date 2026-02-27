@@ -139,6 +139,27 @@ class ConfigLoaderClass {
           throw new Error(`Config.graph.${field} must be a boolean`);
         }
       }
+
+      if (config.graph.annotations !== undefined) {
+        if (!Array.isArray(config.graph.annotations)) {
+          throw new Error('Config.graph.annotations must be an array');
+        }
+
+        config.graph.annotations.forEach((annotation, index) => {
+          if (annotation.x === undefined && annotation.y === undefined) {
+            throw new Error(`Annotation at index ${index} must have x or y`);
+          }
+          if (annotation.x !== undefined && typeof annotation.x !== 'number') {
+            throw new Error(`Annotation at index ${index} x must be a number`);
+          }
+          if (annotation.y !== undefined && typeof annotation.y !== 'number') {
+            throw new Error(`Annotation at index ${index} y must be a number`);
+          }
+          if (annotation.text !== undefined && typeof annotation.text !== 'string') {
+            throw new Error(`Annotation at index ${index} text must be a string`);
+          }
+        });
+      }
     }
 
     return true;
@@ -162,18 +183,45 @@ class ConfigLoaderClass {
     // Merge graph defaults
     if (processedConfig.graph) {
       processedConfig.graph = { ...defaults.graph, ...processedConfig.graph };
+      // Ensure annotations is always an array
+      if (!Array.isArray(processedConfig.graph.annotations)) {
+        processedConfig.graph.annotations = [];
+      }
     }
 
     // Apply defaults to functions
     if (processedConfig.functions) {
       processedConfig.functions = processedConfig.functions.map((func, index) => {
-        return {
+        const normalized = {
           id: func.id || `f${index}`,
           color: this._getDefaultColor(index),
           visible: func.visible !== false,
           editable: func.editable !== false,
           ...func
         };
+
+        // Normalize derivative: must be an object; strip if invalid
+        if (normalized.derivative !== undefined) {
+          if (normalized.derivative !== null && typeof normalized.derivative === 'object') {
+            normalized.derivative = { ...normalized.derivative };
+          } else {
+            delete normalized.derivative;
+          }
+        }
+
+        // Normalize secants: must be an array of objects each with numeric x0
+        if (normalized.secants !== undefined) {
+          if (Array.isArray(normalized.secants)) {
+            const validSecants = normalized.secants.filter(
+              (s) => s !== null && typeof s === 'object' && typeof s.x0 === 'number'
+            );
+            normalized.secants = validSecants.length > 0 ? validSecants : undefined;
+          } else {
+            delete normalized.secants;
+          }
+        }
+
+        return normalized;
       });
     }
 

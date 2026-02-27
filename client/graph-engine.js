@@ -9,7 +9,7 @@ import sharedParser from './math/shared-parser.js';
 import { classifyLine } from './math/line-classifier.js';
 import { analyzeParameters } from './math/parameter-utils.js';
 import { DEFAULT_PARAMETER } from './math/parameter-defaults.js';
-import { toFunctionPlotSyntax } from './math/expression-adapter.js';
+import { toFunctionPlotSyntax, computeDerivative } from './math/expression-adapter.js';
 import { COLORS } from './utils/color-constants.js';
 import { DEFAULT_VIEWPORT_BOUNDS } from './core/config-loader.js';
 import FunctionPlotRenderer from './renderers/function-plot-renderer.js';
@@ -33,6 +33,9 @@ export default class GraphEngine {
 
     // Render lifecycle flags
     this.needsRebuild = true;
+
+    // Metadata parallel to the renderer's data array (one entry per plotted datum)
+    this.datumMeta = [];
 
     // Cleanup tracking
     this.unsubscribers = [];
@@ -247,6 +250,16 @@ export default class GraphEngine {
     return active.matches('.expression-input');
   }
 
+  /**
+   * Custom tooltip renderer for function-plot tip.
+   * Shows the expression id and coordinates: "f: (1.234, 5.678)"
+   */
+  tipRenderer(x, y, index) {
+    const meta = this.datumMeta[index];
+    const id = meta ? meta.id : String(index + 1);
+    return `${id}: (${x.toFixed(3)}, ${y.toFixed(3)})`;
+  }
+
   render() {
     this.frameId = null;
 
@@ -259,7 +272,9 @@ export default class GraphEngine {
     const graph = StateManager.get('graph') || {};
 
     const showGrid = graph.showGrid === true;
-    const data = this.mapFunctionsToPlotData(functions, scope);
+    const annotations = Array.isArray(graph.annotations) ? graph.annotations : [];
+    const { data, meta } = this.mapFunctionsToPlotData(functions, scope);
+    this.datumMeta = meta;
     const viewportForRender = this.getAspectLockedViewport(this.viewport);
 
     if (!this.renderer.isReady()) {
@@ -268,7 +283,9 @@ export default class GraphEngine {
         height: this.height,
         viewport: viewportForRender,
         showGrid,
-        onZoom: this.boundOnRendererZoom
+        annotations,
+        onZoom: this.boundOnRendererZoom,
+        tipRenderer: this.tipRenderer.bind(this)
       });
       this.needsRebuild = false;
     } else if (this.needsRebuild) {
@@ -276,7 +293,8 @@ export default class GraphEngine {
         width: this.width,
         height: this.height,
         viewport: viewportForRender,
-        showGrid
+        showGrid,
+        annotations
       });
       this.needsRebuild = false;
     }
@@ -286,6 +304,7 @@ export default class GraphEngine {
 
   mapFunctionsToPlotData(functions, scopeValues) {
     const data = [];
+    const meta = [];
 
     (functions || []).forEach((func) => {
       if (!func.visible || !func.expression) return;
@@ -299,14 +318,46 @@ export default class GraphEngine {
       if (!adaptedExpression) return;
 
       switch (classification.graphMode) {
-        case 'explicit':
-          data.push({
+        case 'explicit': {
+          const datum = {
             fnType: 'linear',
             fn: adaptedExpression,
             scope: { ...scopeValues },
             color: func.color
-          });
+          };
+
+          if (func.derivative && typeof func.derivative === 'object') {
+            const derivFn = typeof func.derivative.fn === 'string'
+              ? toFunctionPlotSyntax(func.derivative.fn)
+              : computeDerivative(plotExpression);
+
+            if (derivFn) {
+              datum.derivative = { fn: derivFn, scope: { ...scopeValues } };
+              if (typeof func.derivative.x0 === 'number') {
+                datum.derivative.x0 = func.derivative.x0;
+              }
+              if (func.derivative.updateOnMouseMove === true) {
+                datum.derivative.updateOnMouseMove = true;
+              }
+            }
+          }
+
+          if (Array.isArray(func.secants) && func.secants.length > 0) {
+            datum.secants = func.secants
+              .filter((s) => typeof s?.x0 === 'number')
+              .map((s) => {
+                const secant = { x0: s.x0, scope: { ...scopeValues } };
+                if (typeof s.x1 === 'number') secant.x1 = s.x1;
+                if (s.updateOnMouseMove === true) secant.updateOnMouseMove = true;
+                return secant;
+              });
+            if (datum.secants.length === 0) delete datum.secants;
+          }
+
+          data.push(datum);
+          meta.push({ id: func.id });
           break;
+        }
         case 'implicit':
           data.push({
             fnType: 'implicit',
@@ -314,6 +365,7 @@ export default class GraphEngine {
             scope: { ...scopeValues },
             color: func.color
           });
+          meta.push({ id: func.id });
           break;
         case 'inequality':
           break;
@@ -322,7 +374,7 @@ export default class GraphEngine {
       }
     });
 
-    return data;
+    return { data, meta };
   }
 
   /**

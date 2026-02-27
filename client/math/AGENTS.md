@@ -25,12 +25,17 @@ alter math behavior.
 4. `parameter-utils.js`: Derives defined/used parameters and missing assignments
    from classified lines.
 5. `parameter-defaults.js`: Default slider metadata `{ value, min, max, step }`.
-6. `expression-adapter.js`: AST-based conversion layer with two public
+6. `expression-adapter.js`: AST-based conversion layer with three public
    functions:
    - `toFunctionPlotSyntax(expression)`: Normalizes aliases for function-plot
      (`pi/PI -> PI`, `e/E -> E`, `ln -> log`) without mutating raw input.
    - `toDisplayLatex(expression)`: Converts raw expression text into polished
      LaTeX (`pi/PI -> \\pi`, `ln -> \\ln`) and handles top-level relations.
+   - `computeDerivative(expression)`: Symbolically differentiates an explicit
+     RHS expression w.r.t. `x` using math.js, pipes result through
+     `toFunctionPlotSyntax`, and returns the function-plot-ready string.
+     Returns `null` if differentiation fails (e.g., invalid expression).
+     Results are LRU-cached (200 entries).
 7. `utils/math-formatter.js`: Converts expressions to LaTeX and back; renders
    with KaTeX. `toLatex()` delegates to `expression-adapter.js`.
 

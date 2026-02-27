@@ -176,6 +176,38 @@ export const toFunctionPlotSyntax = (expression) => {
   }
 };
 
+const derivativeCache = new Map();
+
+/**
+ * Symbolically differentiate a math expression with respect to x and return
+ * the result normalized for function-plot syntax.
+ * Returns null if the expression cannot be differentiated.
+ *
+ * @param {string} expression - Raw math expression (RHS only, e.g. "x^2 + a")
+ * @returns {string|null} Derivative expression ready for function-plot, or null
+ */
+export const computeDerivative = (expression) => {
+  if (typeof expression !== 'string' || !expression.trim()) {
+    return null;
+  }
+
+  const cached = readCache(derivativeCache, expression);
+  if (cached !== null) {
+    return cached === '__null__' ? null : cached;
+  }
+
+  try {
+    const parsed = math.parse(expression);
+    const derivativeNode = math.derivative(parsed, 'x');
+    const result = toFunctionPlotSyntax(derivativeNode.toString());
+    writeCache(derivativeCache, expression, result);
+    return result;
+  } catch (error) {
+    writeCache(derivativeCache, expression, '__null__');
+    return null;
+  }
+};
+
 export const toDisplayLatex = (expression) => {
   if (typeof expression !== 'string') {
     return '';

@@ -37,7 +37,9 @@ commands, or architecture.
      from classified lines).
    - Expression adaptation: `math/expression-adapter.js` (AST-based conversion
      layer that normalizes expressions for function-plot and produces polished
-     display LaTeX from raw user input).
+     display LaTeX from raw user input). Also provides `computeDerivative(expr)`
+     which symbolically differentiates an explicit RHS expression with respect to
+     `x` using math.js and returns the result adapted for function-plot.
    - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX, delegated to
      `math/expression-adapter.js` for expression-to-LaTeX conversion).
 5. **UI components**:
@@ -54,11 +56,31 @@ commands, or architecture.
      the canonical state viewport unchanged. Parameter detection is deferred
      while `.expression-input` is focused and resumes on
      `expressions:committed`.
+     - `mapFunctionsToPlotData` returns `{ data, meta }` where `meta` is a
+       parallel array of `{ id }` entries for each plotted datum (used by
+       `tipRenderer` to show expression ids in tooltips).
+     - `tipRenderer(x, y, index)` formats the on-curve tooltip as
+       `id: (x, y)` using `datumMeta`.
+     - Reads `graph.annotations` from state and passes to renderer on every
+       `init()` and `rebuild()`.
+     - For explicit expressions with `func.derivative`, auto-computes the
+       symbolic derivative via `computeDerivative()` (or uses the caller-
+       supplied `fn` string) and attaches it to the datum. `updateOnMouseMove`
+       and `x0` are forwarded when present.
+     - For explicit expressions with `func.secants`, maps the array onto
+       function-plot secant objects (forwarding `x0`, `x1`,
+       `updateOnMouseMove`) with `scope` injected from current parameters.
 6. **Config**:
    - Primary: `configs/config.json` (loaded first). Fallback:
      `configs/default-config.js` (used when JSON unavailable).
    - Example configurations: `configs/samples/` contains example JSON files for
      reference; keep schema consistent with `config.json`.
+   - `graph.annotations` (optional array): each entry is
+     `{ x?: number, y?: number, text?: string }`. Vertical line if `x` set,
+     horizontal if `y` set. Defaults to `[]`. Validated and normalized by
+     `ConfigLoader`. Passed to function-plot on every render.
+   - Function entries support optional `derivative` (object) and `secants`
+     (array) fields for educational overlays; see Coding rules for semantics.
 7. **Logging**:
    - Client logger: `utils/logger.js` provides `Logger.logActivity()` and
      `Logger.debug()` methods.
@@ -98,7 +120,20 @@ commands, or architecture.
 - **Expression adaptation**: Before passing `plotExpression` to function-plot,
   GraphEngine must call `toFunctionPlotSyntax()` from
   `math/expression-adapter.js` to normalize `pi/e/ln` aliases without mutating
-  raw user input.
+  raw user input. For derivatives, use `computeDerivative(plotExpression)` from
+  the same module; it symbolically differentiates w.r.t. `x` and returns a
+  function-plot-ready string (or `null` on failure).
+- **Derivative/secant overlays**: Supported on explicit (`fnType: 'linear'`)
+  datums only. Config schema: `functions[i].derivative` is an object with
+  optional `{ fn, x0, updateOnMouseMove }`; `functions[i].secants` is an array
+  of `{ x0, x1?, updateOnMouseMove? }`. If `derivative.fn` is omitted,
+  GraphEngine auto-computes it via `computeDerivative()`. Both receive the
+  current parameter `scope` automatically.
+- **Annotations**: `state.graph.annotations` is an array of
+  `{ x?, y?, text? }` passed directly to function-plot on every `init` and
+  `rebuild`. They are config-driven; to update at runtime call
+  `StateManager.set('graph', { ...StateManager.get('graph'), annotations: [...] })`
+  which triggers a rebuild.
 - **Classification metadata**: `state.functions` entries may include derived
   classification fields (`kind`, `graphMode`, `error`, `paramName`, `value`,
   `usedVariables`, `plotExpression`) for UI consistency; GraphEngine still

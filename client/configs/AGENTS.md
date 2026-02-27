@@ -14,7 +14,8 @@ The loading happens in `client/app.js` → `initState()` → `ConfigLoader` → 
 
 `ConfigLoader` (`client/core/config-loader.js`) provides:
 
-- **Validation**: Validates config structure (functions array with required `id`/`expression`, graph object with numeric bounds)
+- **Validation**: Validates config structure (functions array with required `id`/`expression`,
+  graph object with numeric bounds, optional `annotations` array where each entry has numeric `x` or `y`)
 - **Defaults**: Applies default values (colors, visibility flags, graph settings).
 - **Events**: Publishes `config:loaded` event after successful processing
 - **Dual Interface**:
@@ -27,7 +28,10 @@ The loading happens in `client/app.js` → `initState()` → `ConfigLoader` → 
 - **Role**: Primary configuration file loaded at application startup
 - **Usage**: Actively loaded by `app.js` via `ConfigLoader.load('./configs/config.json')`
 - **Purpose**: Defines runtime state (viewport bounds, initial expressions, display settings)
-- **Schema**: `{functions: [{id, expression, visible?}], graph: {xMin, xMax, yMin, yMax, showGrid?}}`
+- **Schema**: `{functions: [{id, expression, visible?, derivative?, secants?}], graph: {xMin, xMax, yMin, yMax, showGrid?, annotations?}}`
+  - `graph.annotations`: `[{x?: number, y?: number, text?: string}]` — vertical/horizontal reference lines
+  - `functions[i].derivative`: `{fn?: string, x0?: number, updateOnMouseMove?: boolean}` — tangent line overlay (explicit only; `fn` auto-computed if omitted)
+  - `functions[i].secants`: `[{x0: number, x1?: number, updateOnMouseMove?: boolean}]` — secant line overlays (explicit only)
 
 ### 2. `client/configs/default-config.js` (Fallback Config)
 - **Role**: Fallback configuration when `config.json` is unavailable or fails to load

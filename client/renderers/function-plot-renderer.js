@@ -23,13 +23,20 @@ export default class FunctionPlotRenderer {
     height,
     viewport,
     showGrid,
-    onZoom
+    onZoom,
+    tipRenderer,
+    annotations
   }) {
     if (!this.container) return;
 
     this.callbacks = {
       onZoom: typeof onZoom === 'function' ? onZoom : null
     };
+
+    const tip = { xLine: true, yLine: true };
+    if (typeof tipRenderer === 'function') {
+      tip.renderer = tipRenderer;
+    }
 
     this.options = {
       target: this.container,
@@ -45,10 +52,8 @@ export default class FunctionPlotRenderer {
         type: 'linear',
         domain: [viewport.yMin, viewport.yMax]
       },
-      tip: {
-        xLine: true,
-        yLine: true
-      },
+      tip,
+      annotations: Array.isArray(annotations) ? annotations : [],
       data: []
     };
 
@@ -83,12 +88,13 @@ export default class FunctionPlotRenderer {
     }
   }
 
-  rebuild({ width, height, viewport, showGrid }) {
+  rebuild({ width, height, viewport, showGrid, annotations }) {
     if (!this.chart || !this.options) return;
 
     this.options.width = width;
     this.options.height = height;
     this.options.grid = showGrid;
+    this.options.annotations = Array.isArray(annotations) ? annotations : (this.options.annotations || []);
 
     this.options.xAxis = this.options.xAxis || { type: 'linear' };
     this.options.yAxis = this.options.yAxis || { type: 'linear' };

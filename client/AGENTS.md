@@ -58,6 +58,8 @@ styling is a last resort.
 - `renderers/function-plot-renderer.js`: Adapter over `function-plot` that owns
   chart init/rebuild/draw and forwards zoom events. Uses function-plot native
   axis ticks/labels, grid via options, and on-curve tip (crosshairs + tooltip).
+  Accepts `tipRenderer` (function) and `annotations` (array) in `init()`;
+  `rebuild()` also accepts `annotations` to update reference lines.
 - GraphEngine enforces equal unit scale on X/Y during render by deriving an
   aspect-locked viewport from the canonical state viewport and current canvas
   size. Policy is fixed to expanding the smaller axis around center (never
@@ -80,7 +82,9 @@ styling is a last resort.
   caching across components.
 - `math/expression-adapter.js` is the single expression adaptation layer:
   `toFunctionPlotSyntax()` normalizes plot expressions for function-plot,
-  `toDisplayLatex()` converts raw user input into polished LaTeX for display.
+  `toDisplayLatex()` converts raw user input into polished LaTeX for display,
+  `computeDerivative()` symbolically differentiates an explicit RHS expression
+  w.r.t. `x` and returns a function-plot-ready string (or `null` on failure).
 - ExpressionList still uses `ExpressionParser.isParameter()` for optional
   auto-conversion of bare params.
 
@@ -89,6 +93,14 @@ styling is a last resort.
   `configs/default-config.js` (used when JSON unavailable).
 - Example configurations: `configs/samples/` contains example JSON files for
   reference; keep schema consistent with `config.json`.
+- `graph.annotations`: optional `[{x?, y?, text?}]` for reference lines.
+  Validated by ConfigLoader (must have `x` or `y`; defaults to `[]`).
+  Passed to function-plot on every `init`/`rebuild`.
+- Function entries support optional `derivative: {fn?, x0?, updateOnMouseMove?}`
+  and `secants: [{x0, x1?, updateOnMouseMove?}]` for educational overlays on
+  explicit expressions. ConfigLoader normalizes and strips invalid structures.
+  GraphEngine auto-computes `derivative.fn` via `computeDerivative()` when not
+  supplied; injects current parameter `scope` into both.
 - GraphEngine's `detectAndUpdateParameters()` automatically:
   - Detects parameters from graph lines (variables other than `x` and `y`)
   - Ensures `parameters` entries for new parameters (value/min/max/step)
