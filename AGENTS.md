@@ -125,11 +125,11 @@ commands, or architecture.
    - Logs directory: Created automatically on server startup if missing.
      Log files are plain text, one message per line.
 8. **Server/build**:
-   - Dev: Vite (`npm run start:dev`) serves client on :3000, proxies API/ws to
-     :3001.
-   - Prod: `server.js` (Express-free static server + optional WebSocket
-     broadcast). `npm run build` outputs to `dist/`; `npm run start:prod` serves
-     `dist/` on :3000 with `IS_PRODUCTION=true`.
+   - Dev: Vite (`npm run start:dev`) serves client on :3000 and proxies API
+     requests to :3001.
+   - Prod: `server.js` is an Express-free static server. `npm run build`
+     outputs to `dist/`; `npm run start:prod` serves `dist/` on :3000 with
+     `IS_PRODUCTION=true`.
    - `npm start` aliases `start:prod`. Keep ports in sync with
      `vite.config.js` proxies.
 
@@ -190,12 +190,6 @@ commands, or architecture.
 - Prod serve: `npm run start:prod` (sets `IS_PRODUCTION=true`, serves `dist/` on
   3000)
 - Quick start (prod): `npm start`
-- WebSocket broadcast (optional, requires `ws`):
-  ```sh
-  curl -X POST http://localhost:3000/message \
-    -H "Content-Type: application/json" \
-    -d '{"message":"Hi"}'
-  ```
 - Enable debug logging: Add `?debug=true` to URL
   (e.g., `http://localhost:3000?debug=true`)
 

@@ -11,15 +11,6 @@ export default defineConfig({
       '/api/logs': {
         target: 'http://localhost:3001',
         changeOrigin: true
-      },
-      '/message': {
-        target: 'http://localhost:3001',
-        changeOrigin: true
-      },
-      '/ws': {
-        target: 'ws://localhost:3001',
-        ws: true,
-        changeOrigin: true
       }
     }
   },
@@ -37,4 +28,3 @@ export default defineConfig({
     ]
   }
 });
-

@@ -3,18 +3,6 @@ const fs = require('fs');
 const path = require('path');
 const url = require('url');
 
-// Try to load WebSocket module, fallback if not available
-let WebSocket = null;
-let isWebSocketAvailable = false;
-try {
-  WebSocket = require('ws');
-  isWebSocketAvailable = true;
-  console.log('WebSocket support enabled');
-} catch (error) {
-  console.log('WebSocket support disabled (ws package not installed)');
-  console.log('Install with: npm install ws');
-}
-
 const DIST_DIR = path.join(__dirname, 'dist');
 // Check if IS_PRODUCTION is set to true
 const isProduction = process.env.IS_PRODUCTION === 'true';
@@ -31,9 +19,6 @@ const CONFIG_PATH = path.resolve(__dirname, CONFIG_PATH_ENV);
 
 // Logs directory path
 const LOGS_DIR = path.join(__dirname, 'logs');
-
-// Track connected WebSocket clients
-const wsClients = new Set();
 
 // MIME types for different file extensions
 const mimeTypes = {
@@ -172,49 +157,6 @@ function handlePostRequest(req, res, parsedUrl) {
         res.end(JSON.stringify({ error: 'Invalid JSON' }));
       }
     });
-  } else if (parsedUrl.pathname === '/message') {
-    let body = '';
-
-    req.on('data', chunk => {
-      body += chunk.toString();
-    });
-
-    req.on('end', () => {
-      try {
-        const data = JSON.parse(body);
-        const message = data.message;
-
-        if (!message) {
-          res.writeHead(400, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Message is required' }));
-          return;
-        }
-
-        // Check if WebSocket is available
-        if (!isWebSocketAvailable) {
-          res.writeHead(503, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({
-            error: 'WebSocket functionality not available',
-            details: 'Install the ws package with: npm install ws'
-          }));
-          return;
-        }
-
-        // Broadcast message to all connected WebSocket clients
-        wsClients.forEach(client => {
-          if (client.readyState === WebSocket.OPEN) {
-            client.send(JSON.stringify({ type: 'message', message: message }));
-          }
-        });
-
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ success: true, clientCount: wsClients.size }));
-
-      } catch (error) {
-        res.writeHead(400, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Invalid JSON' }));
-      }
-    });
   } else {
     res.writeHead(404, { 'Content-Type': 'text/plain' });
     res.end('Not found');
@@ -263,32 +205,6 @@ const server = http.createServer((req, res) => {
   }
 });
 
-// Create WebSocket server only if WebSocket is available
-// Note: WebSocket upgrade handling is performed automatically by the ws library
-// when attached to the HTTP server. The HTTP request handler should NOT send
-// a response for upgrade requests - the ws library handles the upgrade internally.
-if (isWebSocketAvailable) {
-  const wss = new WebSocket.Server({
-    server,
-    path: '/ws'
-  });
-
-  wss.on('connection', (ws, req) => {
-    console.log('New WebSocket client connected');
-    wsClients.add(ws);
-
-    ws.on('close', () => {
-      console.log('WebSocket client disconnected');
-      wsClients.delete(ws);
-    });
-
-    ws.on('error', (error) => {
-      console.error('WebSocket error:', error);
-      wsClients.delete(ws);
-    });
-  });
-}
-
 // Start server
 server.listen(PORT, () => {
   // Ensure logs directory exists on startup
@@ -308,11 +224,6 @@ server.listen(PORT, () => {
     });
   } else {
     console.log(`Development mode - static files served by Vite`);
-  }
-  if (isWebSocketAvailable) {
-    console.log(`WebSocket server running on /ws`);
-  } else {
-    console.log(`WebSocket functionality disabled - install 'ws' package to enable`);
   }
   console.log(`Logging endpoint available at /api/logs`);
   console.log('Press Ctrl+C to stop the server');

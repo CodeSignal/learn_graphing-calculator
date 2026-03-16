@@ -1,7 +1,7 @@
 {
   "name": "bespoke-template",
   "version": "0.0.2",
-  "description": "Bespoke template with local development server and WebSocket messaging",
+  "description": "Graphing calculator with a local development server",
   "main": "server.js",
   "scripts": {
     "start": "npm run start:prod",
@@ -18,16 +18,14 @@
     "bespoke",
     "template",
     "development",
-    "server",
-    "websocket"
+    "server"
   ],
   "author": "",
   "license": "MIT",
   "dependencies": {
     "function-plot": "1.24.4",
     "katex": "^0.16.11",
-    "mathjs": "^12.4.1",
-    "ws": "^8.14.2"
+    "mathjs": "^12.4.1"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
