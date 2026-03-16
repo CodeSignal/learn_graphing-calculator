@@ -1,176 +1,232 @@
-# Bespoke Simulation Template
+# CodeSignal CosmoPlot
 
-This directory contains a template for creating embedded applications that share a consistent design system and user experience.
+CodeSignal CosmoPlot is a browser-based graphing calculator. It runs locally with a small Node server and a Vite-based development setup.
 
-## Components
+## Overview
 
-### 1. Design System Integration
-This template uses the CodeSignal Design System located in `client/design-system/`:
-- **Foundations**: Colors, spacing, typography tokens
-- **Components**: Buttons, boxes, inputs, dropdowns, tags
-- Light and dark theme support (automatic)
-- See the [design system repository](https://github.com/CodeSignal/learn_bespoke-design-system) for full documentation
+CosmoPlot currently supports the following graphing workflows:
 
-### 2. `client/app.css`
-Application-specific CSS providing:
-- Base layout components (header, sidebar, main-layout)
-- Utility classes (spacer)
-- Application-specific styling and overrides
-
-### 3. `client/index.html`
-A base HTML template that includes:
-- Navigation header with app name and help button
-- Main layout structure (sidebar + content area)
-- Help modal integration
-- Proper CSS and JavaScript loading
-
-### 4. `client/help-modal.js`
-A dependency-free JavaScript module for the help modal system:
-- Consistent modal behavior across all apps
-- Keyboard navigation (ESC to close)
-- Focus management
-- Custom event system
-
-### 5. `client/help-content-template.html`
-A template for creating consistent help content:
-- Table of contents navigation
-- Standardized section structure
-- FAQ with collapsible details
-- Image integration guidelines
+- Live graphing for explicit expressions such as `sin(x)` and `y = m*x + b`
+- Implicit equations and vertical lines such as `x^2 + y^2 = 9` and `x = 3`
+- Inequality shading such as `y > x^2` and `x <= 3`
+- Point plotting with `points([[0,0],[1,2]])`
+- Vector plotting with `vector([3,2],[1,1])`
+- Parameter assignments such as `a = 2`
+- Auto-generated sliders for parameters used in graph expressions such as
+`a*sin(b*x)`
+- Separate sidebar tabs for graph expressions and parameters
+- Pan, zoom, reset-view controls, and a built-in help modal
 
 ## Usage Instructions
 
-### Setting Up a New Application
+### Install dependencies
 
-1. **Clone the repository**
-2. **Ensure the design-system submodule is initialized**:
-   ```bash
-   git submodule update --init --recursive
-   ```
-
-3. **Customize the HTML template** by replacing placeholders:
-   - `<!-- APP_TITLE -->` - Your application title
-   - `<!-- APP_NAME -->` - Your application name (appears in header)
-   - `<!-- APP_SPECIFIC_HEADER_CONTENT -->` - Any additional header elements
-   - `<!-- APP_SPECIFIC_MAIN_CONTENT -->` - Your main content area
-   - `<!-- APP_SPECIFIC_CSS -->` - Links to your app-specific CSS files
-   - `<!-- APP_SPECIFIC_SCRIPTS -->` - Links to your app-specific JavaScript files
-
-3. **Use Design System Components**
-   The template uses design system components directly. Use these classes:
-   - Buttons: `button button-primary`, `button button-secondary`, `button button-danger`, `button button-text`
-   - Boxes/Cards: `box card` for card containers
-   - Inputs: Add `input` class to input elements: `<input type="text" class="input" />`
-
-4. **Implement your application logic**. You can use Cursor or other agents for it. There is a file called `AGENTS.md` that contains context LLM can use.
-5. **Customise your help content** using the help content template
-3. **Use Design System Components**
-   The template uses design system components directly. Use these classes:
-   - Buttons: `button button-primary`, `button button-secondary`, `button button-danger`, `button button-text`
-   - Boxes/Cards: `box card` for card containers
-   - Inputs: Add `input` class to input elements: `<input type="text" class="input" />`
-
-4. **Implement your application logic**. You can use Cursor or other agents for it. There is a file called `AGENTS.md` that contains context LLM can use.
-5. **Customise your help content** using the help content template
-
-### Customizing Help Content
-
-Use the `help-content-template.html` as a starting point:
-
-1. **Replace placeholders** like `<!-- APP_NAME -->` with your actual content
-2. **Add sections** as needed for your application
-3. **Include images** by placing them in a `help/img/` directory
-4. **Use the provided structure** for consistency across applications
-
-
-### Help Modal API
-
-The `HelpModal` class provides several methods:
-
-```javascript
-// Initialize
-const modal = HelpModal.init({
-  triggerSelector: '#btn-help',
-  content: helpContent,
-  theme: 'auto'
-});
-
-// Update content dynamically
-modal.updateContent(newHelpContent);
-
-// Destroy the modal
-modal.destroy();
-```
-
-## Server
-
-This template includes a local development server (`server.js`) that provides:
-- Static file serving for your application
-- A REST API for writing application logs
-
-### Starting the Server
+If you cloned the repository with Git, initialize the design-system submodule
+before starting the app:
 
 ```bash
-# Local development
-npm run start:dev   # Vite + API for local development
-# Production
-npm run build       # Create production build in dist/
-npm run start:prod  # Serve built assets from dist/
+git submodule update --init
 ```
 
+Then install dependencies:
 
-### Environment Variables
+```bash
+npm install
+```
 
-The server supports the following environment variables:
+### Run in development
 
-- **`PORT`** - Server port number
-  - Development: Can be set to any port (e.g., `PORT=3001`), defaulting to `3000`
-  - Production: Ignored (always `3000` when `IS_PRODUCTION=true`)
+```bash
+npm run start:dev
+```
 
-- **`IS_PRODUCTION`** - Enables production mode
-  - Set to `'true'` to enable production mode
-  - When enabled:
-    - Server serves static files from `dist/` directory
-    - Port is forced to `3000`
-    - Requires `dist/` directory to exist (throws error if missing)
+Then open [http://localhost:3000](http://localhost:3000).
 
+Development mode uses Vite for the frontend and the local API server for logs.
+The frontend runs on port `3000`, the logging API runs on port `3001`, and the
+app loads its editable config from `client/configs/config.json`.
 
-### Vite Build System
+### Build and run in production mode
 
-This project uses [Vite](https://vitejs.dev/) as the build tool for fast development and optimized production builds.
+```bash
+npm run build
+npm run start:prod
+```
 
-#### Build Process
+Then open [http://localhost:3000](http://localhost:3000).
 
-Running `npm run build` executes `vite build`, which:
-- Reads source files from the `client/` directory (configured in `vite.config.js`)
-- Processes and bundles JavaScript, CSS, and other assets
-- Outputs optimized production files to the `dist/` directory
-- Generates hashed filenames for cache busting
+In production mode, the server serves built assets from `dist/` and exposes the
+config to the browser at `/configs/config.json`. That production config is read
+from:
+
+- `CONFIG_PATH` if you set it
+- otherwise `./config.json` at the repo root or extracted release root
+
+If that file does not exist, the client falls back to the bundled default config from `client/configs/default-config.js`.
+
+## Config Reference
+
+CosmoPlot reads a JSON object with this top-level shape:
+
+```json
+{
+  "functions": [],
+  "graph": {}
+}
+```
+
+### Minimal example
+
+```json
+{
+  "functions": [
+    {
+      "id": "f",
+      "expression": "m*x + b",
+      "visible": true
+    }
+  ],
+  "graph": {
+    "xMin": -10,
+    "xMax": 10,
+    "yMin": -10,
+    "yMax": 10,
+    "showGrid": true
+  }
+}
+```
+
+### `functions`
+
+Each entry in `functions` represents one row in the calculator.
+
+Required fields:
+
+- `id`: unique label used by the UI and activity log
+- `expression`: the math input to classify and plot
+
+Common optional fields:
+
+- `visible`: hide or show the row on first load
+- `editable`: if set to `false`, the row is not meant to be edited in the UI
+- `derivative`: tangent-line overlay for explicit functions
+- `secants`: secant-line overlays for explicit functions
+
+Example overlay fields:
+
+```json
+{
+  "id": "f",
+  "expression": "x^2",
+  "derivative": {
+    "x0": 1
+  },
+  "secants": [
+    { "x0": -1, "x1": 1 }
+  ]
+}
+```
+
+### `graph`
+
+The `graph` object controls the initial viewport and display options.
+
+Required bounds:
+
+- `xMin`
+- `xMax`
+- `yMin`
+- `yMax`
+
+Optional fields:
+
+- `showGrid`: `true` or `false`
+- `annotations`: reference lines shown on the graph
+
+Annotation entries use this shape:
+
+```json
+{
+  "x": 2,
+  "text": "x = 2"
+}
+```
+
+You may also use `y` for a horizontal reference line. Each annotation must have at least `x` or `y`.
+
+### Practical expression examples
+
+- Explicit graph: `sin(x)`
+- Explicit assignment form: `y = m*x + b`
+- Function definition form: `f(x) = x^2`
+- Implicit equation: `x^2 + y^2 = 9`
+- Strict inequality: `y > x^2`
+- Inclusive inequality: `x <= 3`
+- Points: `points([[0,0],[1,2]])`
+- Vector: `vector([3,2],[1,1])`
+- Parameter assignment: `a = 2`
+- Parameterized graph with sliders: `a*sin(b*x)`
+
+## Activity Logging and Grading
+
+The local server creates a `logs/` directory on startup if it does not already exist. Activity logs are written to `logs/activity.log` as plain text, one event per line. This matters for grading. The current app writes activity messages in these formats:
+
+- `Initial state: ...`
+- `Created expression ...`
+- `Modified expression ...`
+- `Modified expression ... (parameter: ...)`
+- `Deleted expression: ...`
+
+When a modified expression is invalid, the log appends the error detail:
+
+```text
+Modified expression expr_1: x++ -> x+ (invalid: Syntax error)
+```
+
+Typical examples:
+
+```text
+Initial state: f: m*x + b
+Created expression expr_1
+Modified expression expr_1:  -> sin(x)
+Modified expression expr_1 (parameter: a): 1 -> 2
+Deleted expression: sin(x)
+```
+
+Optional debug logging is also available by opening the app with `?debug=true`. Those messages go to `logs/debug.log`, not `activity.log`.
 
 ## CI/CD and Automated Releases
 
-This template includes a GitHub Actions workflow (`.github/workflows/build-release.yml`) that automatically builds and releases your application when you push to the `main` branch.
+This repo includes a GitHub Actions workflow at`.github/workflows/build-release.yml` that runs on every push to `main`.
 
-### How It Works
+The workflow currently does the following:
 
-When you push to `main`, the workflow will:
+1. Checks out the repository
+2. Initializes the design-system submodule
+3. Uses Node `22.13.1`
+4. Runs `npm ci`
+5. Runs `npm run build`
+6. Reinstalls production dependencies only
+7. Creates `release.tar.gz`
+8. Publishes a GitHub Release tagged `v<run_number>`
 
-1. **Build the project** - Runs `npm run build` to create production assets in `dist/`
-2. **Create a release tarball** - Packages `dist/`, `package.json`, `server.js`, and production `node_modules/` into `release.tar.gz`
-3. **Create a GitHub Release** - Automatically creates a new release tagged as `v{run_number}` with the tarball attached
+### Release contents
 
-### Release Contents
+The generated `release.tar.gz` contains:
 
-The release tarball (`release.tar.gz`) contains everything needed to deploy the application:
-- `dist/` - Built production assets
-- `package.json` - Project dependencies and scripts
-- `server.js` - Production server
-- `node_modules/` - Production dependencies only
+- `dist/`
+- `package.json`
+- `server.js`
+- production `node_modules/`
 
-### Using Releases
+### Using a release artifact
 
-To deploy a release:
+1. Download `release.tar.gz` from the latest GitHub Release.
+2. Extract it in the target directory.
+3. Provide a `config.json` file
+4. Start the app:
 
-1. Download `release.tar.gz` from the latest GitHub Release (e.g. with `wget`)
-2. Extract (and remove) the tarball: `tar -xzf release.tar.gz && rm release.tar.gz`
-3. Start the production server: `npm run start:prod`
+```bash
+npm run start:prod
+```
+
