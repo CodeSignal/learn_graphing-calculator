@@ -12,6 +12,8 @@ import { DEFAULT_PARAMETER } from '../math/parameter-defaults.js';
 import { toLatex, renderLatex } from '../utils/math-formatter.js';
 import Logger from '../utils/logger.js';
 import { getColorForIndex } from '../utils/color-constants.js';
+import { generateParameterAssignmentId } from '../utils/expression-ids.js';
+import { formatParameterValue } from '../utils/parameter-number-format.js';
 
 export default class ExpressionList {
     constructor(containerId, addButtonId) {
@@ -458,61 +460,28 @@ export default class ExpressionList {
 
         const paramName = param.paramName;
         const defaultVal = DEFAULT_PARAMETER.value;
-        const formatted = this._formatValueForDisplay(defaultVal, DEFAULT_PARAMETER.step);
+        const formatted = formatParameterValue(defaultVal, DEFAULT_PARAMETER.step);
         const newExpr = `${paramName} = ${formatted}`;
 
         this.updateExpression(func.id, newExpr);
         return true; // Conversion happened, should return early
     }
 
-    /**
-     * Format value for display in expression (helper for auto-conversion)
-     * @param {number} value - Value to format
-     * @param {number} step - Step size
-     * @returns {string} Formatted value string
-     * @private
-     */
-    _formatValueForDisplay(value, step) {
-        const decimals = this._getStepDecimals(step);
-        const rounded = this._roundToStep(value, step);
-        if (decimals === 0) {
-            return `${Math.round(rounded)}`;
-        }
-        return rounded.toFixed(decimals);
-    }
+    createSliderChangeHandler(func, item) {
+        return ({ oldValue, newValue, paramName: pName }) => {
+            const paramConfig = StateManager.get(`parameters.${pName}`) || {};
+            const step = paramConfig.step || DEFAULT_PARAMETER.step;
+            const oldExpr = `${pName} = ${formatParameterValue(oldValue, step)}`;
+            const newExpr = `${pName} = ${formatParameterValue(newValue, step)}`;
 
-    /**
-     * Round value to nearest step (helper for auto-conversion)
-     * @param {number} value - Value to round
-     * @param {number} step - Step size
-     * @returns {number} Rounded value
-     * @private
-     */
-    _roundToStep(value, step) {
-        if (!Number.isFinite(step) || step <= 0) {
-            return value;
-        }
-        const scaled = value / step;
-        return Math.round(scaled) * step;
-    }
+            this.updateExpression(func.id, newExpr);
 
-    /**
-     * Get number of decimal places for step (helper for auto-conversion)
-     * @param {number} step - Step size
-     * @returns {number} Number of decimal places
-     * @private
-     */
-    _getStepDecimals(step) {
-        if (!Number.isFinite(step)) return 0;
-        const stepString = step.toString();
-        if (stepString.includes('e-')) {
-            const parts = stepString.split('e-');
-            return Number(parts[1]) || 0;
-        }
-        if (stepString.includes('.')) {
-            return stepString.split('.')[1].length;
-        }
-        return 0;
+            if (item.inputEl) {
+                item.inputEl.value = newExpr;
+            }
+
+            this.logModified(func.id, oldExpr, newExpr, { paramName: pName });
+        };
     }
 
     /**
@@ -553,31 +522,7 @@ export default class ExpressionList {
                 item.sliderContainer,
                 paramName,
                 { value },
-                {
-                    onChange: ({ oldValue, newValue, isDiscrete, paramName: pName }) => {
-                        // Format values for expression display
-                        const paramConfig = StateManager.get(`parameters.${pName}`) || {};
-                        const step = paramConfig.step || DEFAULT_PARAMETER.step;
-                        const formatValue = (val) => {
-                            const decimals = this._getStepDecimals(step);
-                            const rounded = this._roundToStep(val, step);
-                            return decimals === 0 ? `${Math.round(rounded)}` : rounded.toFixed(decimals);
-                        };
-                        const oldExpr = `${pName} = ${formatValue(oldValue)}`;
-                        const newExpr = `${pName} = ${formatValue(newValue)}`;
-
-                        // Update expression in state
-                        this.updateExpression(func.id, newExpr);
-
-                        // Update local input value immediately for responsiveness
-                        if (item.inputEl) {
-                            item.inputEl.value = newExpr;
-                        }
-
-                        // Log user action
-                        this.logModified(func.id, oldExpr, newExpr, { paramName: pName });
-                    }
-                }
+                { onChange: this.createSliderChangeHandler(func, item) }
             );
         } else if (item.parameterSlider.paramName !== paramName) {
             // Parameter name changed - destroy old and create new
@@ -586,31 +531,7 @@ export default class ExpressionList {
                 item.sliderContainer,
                 paramName,
                 { value },
-                {
-                    onChange: ({ oldValue, newValue, isDiscrete, paramName: pName }) => {
-                        // Format values for expression display
-                        const paramConfig = StateManager.get(`parameters.${pName}`) || {};
-                        const step = paramConfig.step || DEFAULT_PARAMETER.step;
-                        const formatValue = (val) => {
-                            const decimals = this._getStepDecimals(step);
-                            const rounded = this._roundToStep(val, step);
-                            return decimals === 0 ? `${Math.round(rounded)}` : rounded.toFixed(decimals);
-                        };
-                        const oldExpr = `${pName} = ${formatValue(oldValue)}`;
-                        const newExpr = `${pName} = ${formatValue(newValue)}`;
-
-                        // Update expression in state
-                        this.updateExpression(func.id, newExpr);
-
-                        // Update local input value immediately for responsiveness
-                        if (item.inputEl) {
-                            item.inputEl.value = newExpr;
-                        }
-
-                        // Log user action
-                        this.logModified(func.id, oldExpr, newExpr, { paramName: pName });
-                    }
-                }
+                { onChange: this.createSliderChangeHandler(func, item) }
             );
         }
 
@@ -882,32 +803,6 @@ export default class ExpressionList {
     }
 
     /**
-     * Generate assignment ID for a parameter expression
-     * @param {string} paramName - Parameter name
-     * @param {Array} existingFunctions - Current functions array
-     * @returns {string} Available assignment ID
-     * @private
-     */
-    _generateAssignmentId(paramName, existingFunctions) {
-        const baseId = `param_${paramName}`;
-        const ids = new Set(existingFunctions.map((f) => f.id));
-
-        if (!ids.has(baseId)) {
-            return baseId;
-        }
-
-        let counter = 2;
-        let candidateId = `${baseId}_${counter}`;
-
-        while (ids.has(candidateId)) {
-            counter += 1;
-            candidateId = `${baseId}_${counter}`;
-        }
-
-        return candidateId;
-    }
-
-    /**
      * Validate user-provided parameter name
      * @param {string} name - Parameter name candidate
      * @param {Array} functions - Current functions array
@@ -1064,9 +959,9 @@ export default class ExpressionList {
             return;
         }
 
-        const newId = this._generateAssignmentId(rawName, functions);
+        const newId = generateParameterAssignmentId(rawName, functions);
         const nextColor = getColorForIndex(functions.length);
-        const defaultVal = this._formatValueForDisplay(
+        const defaultVal = formatParameterValue(
             DEFAULT_PARAMETER.value,
             DEFAULT_PARAMETER.step
         );

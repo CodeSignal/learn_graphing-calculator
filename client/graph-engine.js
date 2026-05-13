@@ -11,6 +11,8 @@ import { analyzeParameters } from './math/parameter-utils.js';
 import { DEFAULT_PARAMETER } from './math/parameter-defaults.js';
 import { toFunctionPlotSyntax, computeDerivative } from './math/expression-adapter.js';
 import { getColorForIndex } from './utils/color-constants.js';
+import { generateParameterAssignmentId } from './utils/expression-ids.js';
+import { formatParameterValue } from './utils/parameter-number-format.js';
 import { DEFAULT_VIEWPORT_BOUNDS } from './core/config-loader.js';
 import FunctionPlotRenderer from './renderers/function-plot-renderer.js';
 
@@ -34,6 +36,7 @@ export default class GraphEngine {
 
     // Render lifecycle flags
     this.needsRebuild = true;
+    this.syncedDisplayConfig = { showGrid: null };
 
     // Metadata parallel to the renderer's data array (one entry per plotted datum)
     this.datumMeta = [];
@@ -216,8 +219,8 @@ export default class GraphEngine {
 
     const nextShowGrid = graph.showGrid === true;
 
-    if (this.showGrid !== nextShowGrid) {
-      this.showGrid = nextShowGrid;
+    if (this.syncedDisplayConfig.showGrid !== nextShowGrid) {
+      this.syncedDisplayConfig.showGrid = nextShowGrid;
       return true;
     }
 
@@ -624,35 +627,10 @@ export default class GraphEngine {
       this.createAssignmentExpressionsForParameters(
         analysis.missingAssignments,
         functions,
-        parameters
+        parameters,
+        analysis.definedParams
       );
     }
-  }
-
-  /**
-   * Generate a semantic ID for assignment expressions based on parameter name
-   * @param {string} paramName - Parameter name (e.g., 'a', 'b', 'm')
-   * @param {Array} existingFunctions - Current functions array
-   * @returns {string} Available assignment ID (e.g., param_a, param_a_2)
-   * @private
-   */
-  _generateAssignmentId(paramName, existingFunctions) {
-    const baseId = `param_${paramName}`;
-    const ids = new Set(existingFunctions.map((f) => f.id));
-
-    if (!ids.has(baseId)) {
-      return baseId;
-    }
-
-    let counter = 2;
-    let candidateId = `${baseId}_${counter}`;
-
-    while (ids.has(candidateId)) {
-      counter += 1;
-      candidateId = `${baseId}_${counter}`;
-    }
-
-    return candidateId;
   }
 
   /**
@@ -661,26 +639,29 @@ export default class GraphEngine {
    * @param {Array} existingFunctions - Current functions array
    * @private
    */
-  createAssignmentExpressionsForParameters(paramNames, existingFunctions, parameters) {
+  createAssignmentExpressionsForParameters(
+    paramNames,
+    existingFunctions,
+    parameters,
+    existingAssignmentNames = new Set()
+  ) {
     const functionsToAdd = [];
 
     paramNames.forEach((paramName) => {
-      const hasAssignment = existingFunctions.some((func) => {
-        if (!func.expression) return false;
-        const assignment = classifyLine(func.expression, sharedParser);
-        return assignment.kind === 'assignment' && assignment.paramName === paramName;
-      });
+      const hasAssignment = existingAssignmentNames.has(paramName);
 
       if (!hasAssignment) {
         const allFunctions = [...existingFunctions, ...functionsToAdd];
-        const newId = this._generateAssignmentId(paramName, allFunctions);
+        const newId = generateParameterAssignmentId(paramName, allFunctions);
         const currentFunctionCount = existingFunctions.length + functionsToAdd.length;
         const nextColor = getColorForIndex(currentFunctionCount);
-        const currentValue = parameters?.[paramName]?.value ?? DEFAULT_PARAMETER.value;
+        const paramConfig = parameters?.[paramName] || {};
+        const currentValue = paramConfig.value ?? DEFAULT_PARAMETER.value;
+        const currentStep = paramConfig.step ?? DEFAULT_PARAMETER.step;
 
         functionsToAdd.push({
           id: newId,
-          expression: `${paramName} = ${currentValue}`,
+          expression: `${paramName} = ${formatParameterValue(currentValue, currentStep)}`,
           color: nextColor,
           visible: true
         });

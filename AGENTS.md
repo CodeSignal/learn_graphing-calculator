@@ -53,7 +53,9 @@ commands, or architecture.
      which symbolically differentiates an explicit RHS expression with respect to
      `x` using math.js and returns the result adapted for function-plot.
    - Formatting: `utils/math-formatter.js` (LaTeX via KaTeX, delegated to
-     `math/expression-adapter.js` for expression-to-LaTeX conversion).
+   `math/expression-adapter.js` for expression-to-LaTeX conversion). Parameter
+   slider expression values use `utils/parameter-number-format.js`; parameter
+   assignment ids use `utils/expression-ids.js`.
 5. **UI components**:
   - `components/expression-list.js` manages expressions (updates go through
      `StateManager.set('functions', ...)` which fires
@@ -144,14 +146,17 @@ commands, or architecture.
 ## Coding rules & patterns
 - **State**: Prefer `StateManager.set('parameters.a.value', val, { silent: true })`
   when avoiding DOM churn, but publish
-  `EventBus.publish('parameters:updated', {...})` so GraphEngine re-renders.
+  `EventBus.publish('parameters:updated', {...})` when the plotted parameter
+  value changes so GraphEngine re-renders. Do not publish for no-op value
+  updates or range/step-only changes.
 - **Expressions**: LineClassifier defines line kinds; GraphEngine backfills
   parameter assignments for any extra symbols detected in graph lines (excluding
   x/y). Assignment lines never plot. In the sidebar, assignment-intent rows live
   in the `θ` tab and are hidden from `f(x)`. `+ Add Parameter` opens an inline
   name composer in the `θ` tab; names must match `[A-Za-z_][A-Za-z0-9_]*`,
   cannot be `x`/`y`, and cannot duplicate existing assignment names. Avoid loops
-  when adding detection paths.
+  when adding detection paths. Reuse `generateParameterAssignmentId()` for
+  semantic assignment ids instead of duplicating collision logic.
   `points` and `vector` are reserved function names and must not be inferred as
   parameter symbols.
   The inline composer's show/hide behavior relies on native `hidden` plus an

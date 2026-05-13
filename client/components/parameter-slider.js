@@ -8,6 +8,11 @@ import NumericSlider from '../design-system/components/numeric-slider/numeric-sl
 import StateManager from '../core/state-manager.js';
 import EventBus from '../core/event-bus.js';
 import { DEFAULT_PARAMETER } from '../math/parameter-defaults.js';
+import {
+    formatParameterValue,
+    getStepDecimals,
+    roundToStep
+} from '../utils/parameter-number-format.js';
 
 export default class ParameterSlider {
     /**
@@ -116,6 +121,7 @@ export default class ParameterSlider {
      */
     handleSliderChange(newValue) {
         const currentConfig = this.getParameterConfig(this.paramName);
+        const previousValue = this.getStoredParameterValue(currentConfig.value);
         const roundedValue = this.roundToStep(newValue, currentConfig.step);
         const nextConfig = this.setParameterConfig(
             this.paramName,
@@ -130,25 +136,26 @@ export default class ParameterSlider {
         let oldValueForDiscrete = null;
         if (!isDragging && !this.sliderInteractionActive) {
             // Discrete change - capture old value before update
-            oldValueForDiscrete = currentConfig.value;
+            oldValueForDiscrete = previousValue;
         }
 
         // Capture start value when drag begins
         if (isDragging && !this.sliderInteractionActive) {
             this.sliderInteractionActive = true;
-            this.sliderEditStartValue = currentConfig.value;
+            this.sliderEditStartValue = previousValue;
         }
 
-        // Publish event for graph
-        EventBus.publish('parameters:updated', {
-            [this.paramName]: nextConfig.value
-        });
+        if (previousValue !== nextConfig.value) {
+            this.publishParameterUpdate(nextConfig.value);
+        }
 
         // Emit onChange callback on interaction end (drag end) or discrete change (non-drag)
         if (!isDragging) {
             if (this.sliderInteractionActive) {
                 // Drag ended - emit once with start -> end
-                const oldValue = this.sliderEditStartValue !== null ? this.sliderEditStartValue : currentConfig.value;
+                const oldValue = this.sliderEditStartValue !== null
+                    ? this.sliderEditStartValue
+                    : previousValue;
                 if (this.callbacks.onChange) {
                     this.callbacks.onChange({
                         oldValue,
@@ -212,11 +219,7 @@ export default class ParameterSlider {
      * @returns {number} Rounded value
      */
     roundToStep(value, step) {
-        if (!Number.isFinite(step) || step <= 0) {
-            return value;
-        }
-        const scaled = value / step;
-        return Math.round(scaled) * step;
+        return roundToStep(value, step);
     }
 
     /**
@@ -225,16 +228,7 @@ export default class ParameterSlider {
      * @returns {number} Number of decimal places
      */
     getStepDecimals(step) {
-        if (!Number.isFinite(step)) return 0;
-        const stepString = step.toString();
-        if (stepString.includes('e-')) {
-            const parts = stepString.split('e-');
-            return Number(parts[1]) || 0;
-        }
-        if (stepString.includes('.')) {
-            return stepString.split('.')[1].length;
-        }
-        return 0;
+        return getStepDecimals(step);
     }
 
     /**
@@ -244,12 +238,7 @@ export default class ParameterSlider {
      * @returns {string} Formatted value string
      */
     formatValue(value, step) {
-        const decimals = this.getStepDecimals(step);
-        const rounded = this.roundToStep(value, step);
-        if (decimals === 0) {
-            return `${Math.round(rounded)}`;
-        }
-        return rounded.toFixed(decimals);
+        return formatParameterValue(value, step);
     }
 
     /**
@@ -320,6 +309,17 @@ export default class ParameterSlider {
             current.min !== next.min ||
             current.max !== next.max ||
             current.step !== next.step;
+    }
+
+    getStoredParameterValue(fallbackValue) {
+        const stored = StateManager.get(`parameters.${this.paramName}`);
+        return Number.isFinite(stored?.value) ? stored.value : fallbackValue;
+    }
+
+    publishParameterUpdate(value) {
+        EventBus.publish('parameters:updated', {
+            [this.paramName]: value
+        });
     }
 
     /**
@@ -407,6 +407,7 @@ export default class ParameterSlider {
         if (!this.paramName) return null;
 
         const current = this.getParameterConfig(this.paramName);
+        const previousValue = this.getStoredParameterValue(current.value);
         const updates = {};
 
         this.settingsInputs.forEach(inputEl => {
@@ -426,19 +427,18 @@ export default class ParameterSlider {
         this.syncSliderSettingsInputs(next);
 
         // If value changed, trigger onChange callback for expression update
-        if (next.value !== current.value && this.callbacks.onChange) {
+        if (next.value !== previousValue && this.callbacks.onChange) {
             this.callbacks.onChange({
-                oldValue: current.value,
+                oldValue: previousValue,
                 newValue: next.value,
                 isDiscrete: true,
                 paramName: this.paramName
             });
         }
 
-        // Publish event for graph
-        EventBus.publish('parameters:updated', {
-            [this.paramName]: next.value
-        });
+        if (next.value !== previousValue) {
+            this.publishParameterUpdate(next.value);
+        }
 
         return next.value !== current.value ? next : null;
     }
@@ -451,6 +451,7 @@ export default class ParameterSlider {
         if (!this.paramName) return null;
 
         const current = this.getParameterConfig(this.paramName);
+        const previousValue = this.getStoredParameterValue(current.value);
         const updates = {
             min: DEFAULT_PARAMETER.min,
             max: DEFAULT_PARAMETER.max,
@@ -466,19 +467,18 @@ export default class ParameterSlider {
         this.syncSliderSettingsInputs(next);
 
         // If value changed, trigger onChange callback for expression update
-        if (next.value !== current.value && this.callbacks.onChange) {
+        if (next.value !== previousValue && this.callbacks.onChange) {
             this.callbacks.onChange({
-                oldValue: current.value,
+                oldValue: previousValue,
                 newValue: next.value,
                 isDiscrete: true,
                 paramName: this.paramName
             });
         }
 
-        // Publish event for graph
-        EventBus.publish('parameters:updated', {
-            [this.paramName]: next.value
-        });
+        if (next.value !== previousValue) {
+            this.publishParameterUpdate(next.value);
+        }
 
         return next.value !== current.value ? next : null;
     }

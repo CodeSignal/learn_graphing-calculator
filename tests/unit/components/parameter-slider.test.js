@@ -299,6 +299,42 @@ describe('ParameterSlider', () => {
 
       slider.destroy()
     })
+
+    it('does not publish parameter updates when committed settings keep value unchanged', () => {
+      mockState.parameters.a = { value: 5, min: 0, max: 10, step: 1 }
+      const slider = new ParameterSlider(
+        container,
+        'a',
+        { value: 5, min: 0, max: 10, step: 1 },
+        { onChange: onChangeCallback }
+      )
+
+      container.querySelector('input[data-setting="min"]').value = '0'
+      container.querySelector('input[data-setting="max"]').value = '10'
+      container.querySelector('input[data-setting="step"]').value = '1'
+      EventBus.publish.mockClear()
+
+      slider.commitSliderSettings()
+
+      expect(EventBus.publish).not.toHaveBeenCalledWith('parameters:updated', expect.anything())
+      slider.destroy()
+    })
+
+    it('does not publish parameter updates when reset leaves value unchanged', () => {
+      mockState.parameters.a = { ...DEFAULT_PARAMETER }
+      const slider = new ParameterSlider(
+        container,
+        'a',
+        { ...DEFAULT_PARAMETER },
+        { onChange: onChangeCallback }
+      )
+      EventBus.publish.mockClear()
+
+      slider.resetSliderSettings()
+
+      expect(EventBus.publish).not.toHaveBeenCalledWith('parameters:updated', expect.anything())
+      slider.destroy()
+    })
   })
 
   describe('Value Updates', () => {
@@ -334,6 +370,39 @@ describe('ParameterSlider', () => {
   })
 
   describe('Interaction Tracking', () => {
+    it('does not publish parameter updates when slider change keeps value unchanged', () => {
+      mockState.parameters.a = { value: 5, min: 0, max: 10, step: 1 }
+      const slider = new ParameterSlider(
+        container,
+        'a',
+        { value: 5, min: 0, max: 10, step: 1 },
+        { onChange: onChangeCallback }
+      )
+      EventBus.publish.mockClear()
+
+      slider.handleSliderChange(5)
+
+      expect(EventBus.publish).not.toHaveBeenCalledWith('parameters:updated', expect.anything())
+      slider.destroy()
+    })
+
+    it('publishes when slider normalization changes the raw stored value', () => {
+      mockState.parameters.a = { value: 1.04, min: 0, max: 10, step: 0.1 }
+      const slider = new ParameterSlider(
+        container,
+        'a',
+        { value: 1.04, min: 0, max: 10, step: 0.1 },
+        { onChange: onChangeCallback }
+      )
+      mockState.parameters.a = { value: 1.04, min: 0, max: 10, step: 0.1 }
+      EventBus.publish.mockClear()
+
+      slider.handleSliderChange(1)
+
+      expect(EventBus.publish).toHaveBeenCalledWith('parameters:updated', { a: 1 })
+      slider.destroy()
+    })
+
     it('should emit onChange callback when value changes', () => {
       const slider = new ParameterSlider(
         container,

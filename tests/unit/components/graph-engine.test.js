@@ -476,6 +476,53 @@ describe('GraphEngine (function-plot migration)', () => {
     expect(tip).toBe('6: (1.000, 2.000)')
   })
 
+  it('uses analyzed assignment names when creating missing parameter assignments', () => {
+    const engine = new GraphEngine('graph-canvas')
+    const existingFunctions = [
+      { id: 'param_a', expression: '', color: '#111', visible: true }
+    ]
+    mockState.functions = existingFunctions
+
+    engine.createAssignmentExpressionsForParameters(
+      ['a', 'b'],
+      existingFunctions,
+      { b: { value: 2 } },
+      new Set(['a'])
+    )
+
+    expect(StateManager.set).toHaveBeenCalledTimes(1)
+    expect(StateManager.set).toHaveBeenCalledWith('functions', [
+      ...existingFunctions,
+      {
+        id: 'param_b',
+        expression: 'b = 2.0',
+        color: expect.any(String),
+        visible: true
+      }
+    ])
+  })
+
+  it('formats auto-created parameter assignments using step precision', () => {
+    const engine = new GraphEngine('graph-canvas')
+    mockState.functions = []
+
+    engine.createAssignmentExpressionsForParameters(
+      ['a'],
+      [],
+      { a: { value: 1, step: 0.1 } },
+      new Set()
+    )
+
+    expect(StateManager.set).toHaveBeenCalledWith('functions', [
+      {
+        id: 'param_a',
+        expression: 'a = 1.0',
+        color: expect.any(String),
+        visible: true
+      }
+    ])
+  })
+
   it('passes tipRenderer and annotations to renderer init', () => {
     mockState.graph = {
       xMin: -10, xMax: 10, yMin: -10, yMax: 10,
@@ -821,7 +868,7 @@ describe('GraphEngine (function-plot migration)', () => {
 
     expect(mockState.parameters.s).toBeTruthy()
     expect(mockState.parameters.s.value).toBe(1)
-    expect(mockState.functions.some((func) => func.expression === 's = 1')).toBe(true)
+    expect(mockState.functions.some((func) => func.expression === 's = 1.0')).toBe(true)
   })
 
   it('still detects parameters for non-typing function changes', () => {
@@ -843,7 +890,7 @@ describe('GraphEngine (function-plot migration)', () => {
 
     expect(mockState.parameters.m).toBeTruthy()
     expect(mockState.parameters.b).toBeTruthy()
-    expect(mockState.functions.some((func) => func.expression === 'm = 1')).toBe(true)
-    expect(mockState.functions.some((func) => func.expression === 'b = 1')).toBe(true)
+    expect(mockState.functions.some((func) => func.expression === 'm = 1.0')).toBe(true)
+    expect(mockState.functions.some((func) => func.expression === 'b = 1.0')).toBe(true)
   })
 })

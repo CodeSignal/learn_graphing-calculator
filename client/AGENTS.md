@@ -105,6 +105,10 @@ styling is a last resort.
   w.r.t. `x` and returns a function-plot-ready string (or `null` on failure).
 - ExpressionList still uses `ExpressionParser.isParameter()` for optional
   auto-conversion of bare params.
+- `utils/expression-ids.js` owns semantic parameter assignment ids
+  (`param_a`, `param_a_2`, ...). `utils/parameter-number-format.js` owns
+  parameter step rounding and expression-display formatting shared by
+  ExpressionList and ParameterSlider.
 
 ## Controls & expressions
 - Primary config: `configs/config.json` (loaded first). Fallback:
@@ -123,7 +127,8 @@ styling is a last resort.
   - Detects parameters from graph lines (variables other than `x` and `y`)
   - Ensures `parameters` entries for new parameters (value/min/max/step)
   - Auto-creates assignment expressions (e.g., `a = 1.0`) for parameters that
-    don't already have assignments
+    don't already have assignments, reusing the `analyzeParameters()` result
+    instead of reclassifying inside assignment creation
   - Uses debouncing (300ms), but defers detection while a text expression input
     is focused and runs it on `expressions:committed`
   - Ignores reserved function names (`points`, `vector`) during symbol
@@ -132,7 +137,9 @@ styling is a last resort.
   ParameterSlider manages the slider UI, settings panel, and parameter config
   normalization. ExpressionList handles expression updates and logging based
   on ParameterSlider's onChange callbacks. Assignment rows are rendered in the
-  `θ` tab only.
+  `θ` tab only. ParameterSlider publishes `parameters:updated` only when the
+  effective plotted value changes; range/step-only or no-op value updates should
+  rely on state changes and must not force graph renders.
 - Primary CTA is contextual by tab:
   - `f(x)`: `+ Add Expression`
   - `θ`: `+ Add Parameter` (opens inline composer)
