@@ -190,14 +190,12 @@ class App {
    * Initialize Help System
    */
   initHelp() {
-    const helpTemplate = document.getElementById('help-content-template');
-    if (!helpTemplate) return;
-
-    const helpContent = helpTemplate.content.cloneNode(true);
+    const helpContent = document.getElementById('help-content');
+    if (!helpContent) return;
 
     this.helpModal = Modal.createHelpModal({
       title: 'Using the Calculator',
-      content: helpContent
+      content: helpContent.content.cloneNode(true)
     });
 
     const btnHelp = document.getElementById('btn-help');

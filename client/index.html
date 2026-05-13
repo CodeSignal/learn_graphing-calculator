@@ -120,101 +120,193 @@
     </div>
   </main>
 
-  <!-- Help Content Template (Hidden) -->
-  <template id="help-content-template">
-    <!-- Table of Contents Navigation -->
+  <!-- Help Content Template (Hidden); keep aligned with line-classifier + UI -->
+  <template id="help-content">
     <nav class="toc">
       <strong>Contents</strong>
       <ul>
         <li><a href="#overview">Overview</a></li>
-        <li><a href="#getting-started">Getting Started</a></li>
-        <li><a href="#features">Key Features</a></li>
+        <li><a href="#expression-syntax">Expression syntax</a></li>
+        <li><a href="#parameters">Parameters</a></li>
+        <li><a href="#working-with-rows">Working with rows</a></li>
+        <li><a href="#graph-controls">Graph controls</a></li>
+        <li><a href="#limitations">Limitations</a></li>
         <li><a href="#shortcuts">Shortcuts</a></li>
       </ul>
     </nav>
 
-    <!-- Overview Section -->
     <section id="overview">
       <h2>Overview</h2>
       <p>
-        CodeSignal CosmoPlot is a graphing calculator that allows you to visualize
-        mathematical expressions. Enter expressions using <b>x</b> as the variable,
-        and the graph will be rendered in real-time in the graph area.
+        CodeSignal CosmoPlot graphs math you type in the sidebar. The sidebar has
+        two tabs: <strong>f(x)</strong> for things that draw on the plot, and
+        <strong>θ</strong> (parameters) for numeric assignments and sliders.
       </p>
-    </section>
-
-    <!-- Getting Started Section -->
-    <section id="getting-started">
-      <h2>Getting Started</h2>
-      <p>To begin graphing expressions:</p>
-      <ol>
-        <li>Click the <strong>+ Add Expression</strong> button in the sidebar</li>
-        <li>Enter a mathematical expression using <code>x</code> as the variable</li>
-        <li>The graph will automatically update as you type</li>
-      </ol>
-
-      <h3>Examples</h3>
-      <p>Here are some example expressions you can try:</p>
-      <ul>
-        <li><code>sin(x)</code> - Sine wave</li>
-        <li><code>x^2 + 5</code> - Parabola shifted up</li>
-        <li><code>abs(x)</code> - Absolute value function</li>
-      </ul>
-    </section>
-
-    <!-- Key Features Section -->
-    <section id="features">
-      <h2>Key Features</h2>
-
-      <h3>Parameters</h3>
       <p>
-        You can use variables like <code>a</code>, <code>b</code>, etc., to create
-        interactive sliders. The graph will update automatically as you adjust the
-        slider values.
+        Most graph lines need <code>x</code> (and sometimes <code>y</code>) as
+        described below. The plot updates as you type; some sidebar behavior
+        (like parameter detection) finishes when you leave the field
+        (<kbd>Enter</kbd> or click away).
       </p>
+    </section>
+
+    <section id="expression-syntax">
+      <h2>Expression syntax</h2>
+      <p>Each line is classified; only valid <strong>graph</strong> lines plot.</p>
+
+      <h3>Explicit <code>y = f(x)</code></h3>
       <ul>
+        <li><code>sin(x)</code>, <code>x^2 + 5</code> — treated like <code>y = …</code></li>
+        <li><code>y = a * x + 1</code> — standard function form</li>
         <li>
-          <code>a * sin(b * x)</code> - Creates sliders for <code>a</code>
-          (amplitude) and <code>b</code> (frequency)
+          <code>f(x) = x^2</code> — function definition; only <code>f(x)</code>
+          with parameter <code>x</code> is supported; the plotted curve uses the
+          body (same as <code>y = …</code>).
         </li>
       </ul>
 
-      <h3>Line Types</h3>
-      <p>Each line is classified as a graph or a definition.</p>
+      <h3>Implicit equations</h3>
+      <ul>
+        <li><code>x^2 + y^2 = 1</code> — relation in <code>x</code> and <code>y</code></li>
+        <li><code>x = y^2</code> — vertical parabola (no <code>x</code> on the RHS)</li>
+      </ul>
+
+      <h3>Inequalities (region + boundary)</h3>
+      <p>
+        One comparator only: <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>,
+        or <code>&gt;=</code>. The expression must involve <code>x</code> or
+        <code>y</code>. Example: <code>x^2 + y^2 &lt; 1</code>. Strict inequalities
+        use a dashed boundary; inclusive use a solid boundary.
+      </p>
+      <p>Chained comparisons like <code>-1 &lt; x &lt; 1</code> are not supported.</p>
+
+      <h3>Points (scatter)</h3>
+      <p>
+        <code>points([[xExpr, yExpr], …])</code> — each pair is a string
+        expression evaluated with your parameters. Do not use <code>x</code> or
+        <code>y</code> inside those coordinate strings. Example:
+        <code>points([[0, 0], [1, 2], [a, b]])</code>.
+      </p>
+
+      <h3>Vectors</h3>
+      <p>
+        <code>vector([vx, vy])</code> or <code>vector([vx, vy], [ox, oy])</code> —
+        same coordinate rules as points (no <code>x</code>/<code>y</code> in
+        components). <code>points</code> and <code>vector</code> are built-in syntax,
+        not parameter names.
+      </p>
+    </section>
+
+    <section id="parameters">
+      <h2>Parameters</h2>
+      <p>
+        Symbols in graph lines besides <code>x</code> and <code>y</code> are treated
+        as parameters. CosmoPlot ensures each has a slider row: if there is no
+        assignment yet, it may add <code>name = 1.0</code> in the θ tab.
+      </p>
+      <p>
+        Parameter detection can run after you commit text (blur/<kbd>Enter</kbd>)
+        and is skipped while an expression input is focused, so the list stays
+        stable while typing.
+      </p>
       <ul>
         <li>
-          <strong>Graph</strong>: An expression that can be evaluated as
-          <code>y = f(x)</code>, including <code>y = 5</code>
+          <strong>θ tab</strong> — assignment lines like <code>a = 1</code> or
+          <code>b = pi</code>; RHS must evaluate to a finite number (no
+          <code>x</code>/<code>y</code> on the RHS).
         </li>
         <li>
-          <strong>Definition</strong>: A parameter assignment like <code>a = 1</code>
-          or <code>b = pi</code>
+          <strong>+ Add Parameter</strong> — opens a name composer; names match
+          <code>[A-Za-z_][A-Za-z0-9_]*</code>, cannot be <code>x</code> or
+          <code>y</code>, and cannot duplicate an existing parameter name.
         </li>
         <li>
-          <strong>Invalid</strong>: Missing <code>x</code> in a graph line or
-          assignments that depend on variables (e.g., <code>a = x + 1</code>)
+          Sliders support value, min, max, and step; changing the plotted value
+          redraws the graph. Dragging updates the plot; logging follows commit-style
+          rules (not every intermediate tick).
+        </li>
+        <li>Example graph with parameters: <code>a * sin(b * x)</code>.</li>
+      </ul>
+    </section>
+
+    <section id="working-with-rows">
+      <h2>Working with rows</h2>
+      <ul>
+        <li>Click the rendered math to edit; the raw text field appears.</li>
+        <li>Graph updates live while typing; blur or <kbd>Enter</kbd> commits.</li>
+        <li>
+          While editing, transient “syntax error” may be hidden until commit so
+          partial input is not noisy.
+        </li>
+        <li>Color chip toggles visibility (dimmed row + hidden from plot).</li>
+        <li>Trash deletes the row.</li>
+        <li>
+          Tab filter: graph-intent rows show under <strong>f(x)</strong>;
+          assignment-intent rows under <strong>θ</strong>; regrouping follows
+          commit.
         </li>
       </ul>
     </section>
 
-    <!-- Shortcuts Section -->
+    <section id="graph-controls">
+      <h2>Graph controls</h2>
+      <ul>
+        <li><strong>Drag</strong> on the plot — pan.</li>
+        <li><strong>Scroll wheel</strong> — zoom in/out.</li>
+        <li>
+          Toolbar <strong>+</strong> / <strong>-</strong> — zoom by fixed factors
+          around the view center.
+        </li>
+        <li>
+          <strong>⟲</strong> — reset viewport to the initial graph from the loaded
+          configuration.
+        </li>
+        <li>
+          <strong>Square units</strong> — X and Y use equal math-units per pixel
+          (aspect lock). On resize, the shorter axis range expands so nothing is
+          cropped; stored bounds may differ slightly from the drawn box.
+        </li>
+        <li>
+          <strong>Tooltip</strong> — on a plottable curve, hover shows
+          <code>id: (x, y)</code> with coordinates to three decimals. Inequality
+          boundaries do not show curve tips.
+        </li>
+        <li>
+          Grid on/off comes from the loaded config (<code>graph.showGrid</code>),
+          not from an in-app toggle in the default UI.
+        </li>
+      </ul>
+      <p>
+        Sidebar width: drag the resizer; use collapse buttons or the floating
+        control to show the sidebar again.
+      </p>
+    </section>
+
+    <section id="limitations">
+      <h2>Limitations</h2>
+      <ul>
+        <li>Parametric curves <code>(x(t), y(t))</code> are not supported.</li>
+        <li>
+          Function definitions must be <code>f(x) = expr</code> with that exact
+          parameter; e.g. <code>f(t) = …</code> or <code>f(x,y) = …</code> is invalid.
+        </li>
+        <li><code>y</code> must appear on the left for <code>y = …</code> forms.</li>
+        <li>
+          Points/vector coordinate expressions cannot reference <code>x</code> or
+          <code>y</code>.
+        </li>
+        <li>
+          Reference lines, derivative overlays, and secants are configuration-only
+          in this build, not created from the sidebar.
+        </li>
+      </ul>
+    </section>
+
     <section id="shortcuts">
       <h2>Shortcuts</h2>
       <ul>
-        <li><strong>ESC</strong> - Close help modal</li>
-      </ul>
-
-      <h3>Mouse Controls</h3>
-      <ul>
-        <li><strong>Drag</strong> - Pan the graph</li>
-        <li><strong>Scroll</strong> - Zoom in/out</li>
-      </ul>
-
-      <h3>Toolbar Buttons</h3>
-      <ul>
-        <li><strong>⟲</strong> - Reset view to initial position</li>
-        <li><strong>+</strong> - Zoom in</li>
-        <li><strong>-</strong> - Zoom out</li>
+        <li><kbd>Esc</kbd> — close this help modal (also close via overlay/footer).</li>
+        <li><kbd>Enter</kbd> — commit expression when the input is focused.</li>
       </ul>
     </section>
   </template>

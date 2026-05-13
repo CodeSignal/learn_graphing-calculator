@@ -8,7 +8,10 @@ styling is a last resort.
    area), and loads `app.js`. Sidebar header includes DS button tabs with
    symbol-only labels: `f(x)` for expressions and `θ` for parameters; labels are
    rendered via KaTeX at runtime. Keep placeholders minimal; app-specific
-   changes belong in JS/CSS, not duplicated HTML.
+   changes belong in JS/CSS, not duplicated HTML. The hidden
+   `template#help-content` is the in-app help reference: when you change
+   supported syntax, tabs, sliders, or graph behavior, update that template so it
+   stays aligned with `math/line-classifier.js` and the expression sidebar.
 2. `app.js`: Bootstraps StateManager, GraphEngine, sidebar components, help
    modal. It is the only place that should instantiate the app; do not spin up
    parallel apps.

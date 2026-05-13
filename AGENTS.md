@@ -8,7 +8,9 @@ commands, or architecture.
 
 ## Architecture (what actually runs)
 1. **Client entry**: `client/index.html` mounts the layout, loads design-system
-   CSS, then `client/app.js`.
+   CSS, then `client/app.js`. In-app help is the hidden `template#help-content`
+   in the same file (`app.js` clones it into the DS help modal); keep that copy
+   aligned with classifier rules and sidebar UX when behavior changes.
 2. **App orchestrator**: `app.js` wires StateManager, GraphEngine (renderer
    controller), SidebarManager, ExpressionList, and the help modal
    (`design-system/components/modal`).
