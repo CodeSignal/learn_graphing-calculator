@@ -10,8 +10,8 @@ const isProduction = process.env.IS_PRODUCTION === 'true';
 if (isProduction && !fs.existsSync(DIST_DIR)) {
   throw new Error(`Production mode enabled but dist directory does not exist: ${DIST_DIR}`);
 }
-// Force port 3000 in production, otherwise use PORT environment variable or default to 3000
-const PORT = isProduction ? 3000 : (process.env.PORT || 3000);
+// Honor PORT in all modes (default 3000); required when quiz owns :3000 in split-screen setups
+const PORT = Number(process.env.PORT) || 3000;
 
 // Config file path resolution
 const CONFIG_PATH_ENV = process.env.CONFIG_PATH || './config.json';
