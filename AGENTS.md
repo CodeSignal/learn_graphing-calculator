@@ -66,7 +66,9 @@ commands, or architecture.
      `f(x)` (graph expressions) and `θ` (parameter assignments), with tab labels
      rendered through KaTeX. Assignment-intent rows render only in the `θ` tab;
      graph rows render only in `f(x)`. The bottom CTA is contextual:
-     `+ Add Expression` in `f(x)` and `+ Add Parameter` in `θ`.
+     `+ Add Expression` in `f(x)` and `+ Add Parameter` in `θ`. Rendered
+     expression boxes use auto-height KaTeX display with horizontal scrolling
+     for wide formulas so tall matrices/fractions are not clipped.
   - `components/sidebar-manager.js` handles resize/toggle.
    - `graph-engine.js` orchestrates render updates and delegates chart drawing
      to `renderers/function-plot-renderer.js`. Plot display uses function-plot

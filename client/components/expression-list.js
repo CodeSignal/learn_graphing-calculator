@@ -254,11 +254,15 @@ export default class ExpressionList {
         if (!expression || expression.trim() === '') {
             // Show placeholder for empty expressions
             item.latexEl.textContent = 'Enter expression...';
+            item.latexEl.removeAttribute('title');
+            item.latexEl.setAttribute('aria-label', 'Enter expression');
             item.latexEl.classList.add('expression-latex-empty');
             return;
         }
 
         item.latexEl.classList.remove('expression-latex-empty');
+        item.latexEl.setAttribute('title', expression);
+        item.latexEl.setAttribute('aria-label', expression);
 
         try {
             // Convert expression to LaTeX
@@ -292,9 +296,13 @@ export default class ExpressionList {
         <div class="expression-color"
             style="background-color: ${func.color};"
             title="Toggle Visibility"></div>
-        <div class="expression-main" style="flex: 1;">
+        <div class="expression-main">
             <div class="expression-input-container">
-                <div class="expression-latex" data-id="${func.id}"></div>
+                <div
+                    class="expression-latex"
+                    data-id="${func.id}"
+                    role="button"
+                    tabindex="0"></div>
                 <input type="text"
                     class="expression-input input"
                     value="${this.escapeHtml(func.expression)}"
@@ -354,6 +362,13 @@ export default class ExpressionList {
         });
 
         latexEl.addEventListener('click', () => {
+            this.switchToInputMode(func.id);
+        });
+
+        latexEl.addEventListener('keydown', (e) => {
+            if (e.key !== 'Enter' && e.key !== ' ') return;
+
+            e.preventDefault();
             this.switchToInputMode(func.id);
         });
 

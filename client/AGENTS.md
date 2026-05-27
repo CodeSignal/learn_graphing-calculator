@@ -59,8 +59,9 @@ styling is a last resort.
   `+ Add Expression` in expressions, `+ Add Parameter` in parameters. Composer
   validates names (`[A-Za-z_][A-Za-z0-9_]*`), rejects `x`/`y` and duplicate
   assignment names, then creates `${name} = 1.0` rows with semantic ids
-  (`param_${name}`, suffixed on collision). Delegates slider functionality to
-  ParameterSlider.
+  (`param_${name}`, suffixed on collision). Rendered LaTeX boxes grow vertically
+  for tall math and scroll horizontally for wide formulas. Delegates slider
+  functionality to ParameterSlider.
 - `components/parameter-slider.js`: Manages parameter slider UI for assignment
   expressions (e.g., `a = 1.0`). Owns slider DOM structure, wraps
   NumericSlider from design system, handles parameter config normalization,

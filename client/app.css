@@ -126,7 +126,7 @@ html, body {
 /* Expression List Item */
 .expression-item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--UI-Spacing-spacing-s);
   padding: var(--UI-Spacing-spacing-s);
   border-bottom: 1px solid var(--Colors-Stroke-Default);
@@ -155,6 +155,11 @@ html, body {
   cursor: pointer;
 }
 
+.expression-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .expression-input-container {
   flex: 1;
   position: relative;
@@ -169,7 +174,7 @@ html, body {
 
 .expression-latex {
   width: 100%;
-  height: var(--UI-Input-md);
+  min-height: var(--UI-Input-md);
   padding: var(--UI-Spacing-spacing-s) var(--UI-Spacing-spacing-s);
   cursor: pointer;
   display: flex;
@@ -187,7 +192,7 @@ html, body {
   line-height: 145%;
   letter-spacing: -0.16px;
   overflow-x: auto;
-  overflow-y: hidden;
+  overflow-y: visible;
   word-break: break-word;
   transition: border-color 0.2s ease, opacity 0.2s ease;
 }

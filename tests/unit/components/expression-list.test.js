@@ -1,4 +1,8 @@
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+
+const appCss = readFileSync(join(process.cwd(), 'client', 'app.css'), 'utf8')
 
 const mockState = {
   functions: [],
@@ -111,6 +115,51 @@ describe('ExpressionList', () => {
     expect(mockState.functions).toHaveLength(2)
     expect(mockState.functions[1].id).toBe('expr_2')
     expect(mockState.functions[1].expression).toBe('')
+  })
+
+  it('renders LaTeX rows with auto-height structure and raw-expression affordance', () => {
+    const expression = 'points([[0, 0], [1, 2], [a, b]])'
+    const expressionList = new ExpressionList('expression-list', 'btn-add-expression')
+    expressionList.init()
+    expressionList.render([
+      { id: 'points_1', expression, color: '#000', visible: true }
+    ])
+
+    const item = expressionList.renderedItems.get('points_1')
+    const expressionMain = item.element.querySelector('.expression-main')
+
+    expect(expressionMain).toBeTruthy()
+    expect(expressionMain.getAttribute('style')).toBeNull()
+    expect(item.latexEl.getAttribute('title')).toBe(expression)
+    expect(item.latexEl.getAttribute('aria-label')).toBe(expression)
+    expect(item.latexEl.getAttribute('role')).toBe('button')
+    expect(item.latexEl.getAttribute('tabindex')).toBe('0')
+  })
+
+  it('keeps rendered LaTeX rows vertically expandable in app CSS', () => {
+    const latexRule = appCss.match(/\.expression-latex\s*\{[^}]+\}/)?.[0] || ''
+    const mainRule = appCss.match(/\.expression-main\s*\{[^}]+\}/)?.[0] || ''
+
+    expect(latexRule).toContain('min-height: var(--UI-Input-md);')
+    expect(latexRule).not.toContain('\n  height: var(--UI-Input-md);')
+    expect(latexRule).toContain('overflow-x: auto;')
+    expect(latexRule).toContain('overflow-y: visible;')
+    expect(mainRule).toContain('flex: 1;')
+    expect(mainRule).toContain('min-width: 0;')
+  })
+
+  it('opens focused LaTeX rows for editing with Enter or Space', () => {
+    const expressionList = new ExpressionList('expression-list', 'btn-add-expression')
+    expressionList.init()
+    expressionList.render([
+      { id: 'expr_1', expression: 'x^2', color: '#000', visible: true }
+    ])
+
+    const item = expressionList.renderedItems.get('expr_1')
+    item.latexEl.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }))
+
+    expect(item.inputEl.style.display).toBe('block')
+    expect(item.latexEl.style.display).toBe('none')
   })
 
   it('uses Add Parameter CTA in parameters tab and opens inline composer', () => {
