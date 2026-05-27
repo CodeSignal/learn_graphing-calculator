@@ -419,6 +419,64 @@ describe('ExpressionParser', () => {
       expect(result.points).toEqual([['1', '2'], ['a + 1', 'b']])
     })
 
+    it('detects tuple point shorthand and extracts coordinate expressions', () => {
+      const result = parser.parsePointsSyntax('(1, 2)')
+      expect(result.isPoints).toBe(true)
+      expect(result.isMalformed).toBe(false)
+      expect(result.points).toEqual([['1', '2']])
+    })
+
+    it('preserves tuple coordinate expression halves', () => {
+      const result = parser.parsePointsSyntax('(a + 1, b)')
+      expect(result.isPoints).toBe(true)
+      expect(result.isMalformed).toBe(false)
+      expect(result.points).toEqual([['a + 1', 'b']])
+    })
+
+    it('marks tuple shorthand with extra top-level commas as malformed', () => {
+      const result = parser.parsePointsSyntax('(1, 2, 3)')
+      expect(result.isPoints).toBe(true)
+      expect(result.isMalformed).toBe(true)
+      expect(result.error).toBeTruthy()
+    })
+
+    it('marks wrapped tuple shorthand as malformed', () => {
+      const result = parser.parsePointsSyntax('((1, 2))')
+      expect(result.isPoints).toBe(true)
+      expect(result.isMalformed).toBe(true)
+      expect(result.error).toBeTruthy()
+    })
+
+    it('returns not-points for non-top-level tuple-like expressions', () => {
+      const result = parser.parsePointsSyntax('(1,2) + 3')
+      expect(result).toEqual({
+        isPoints: false,
+        isMalformed: false,
+        points: [],
+        error: null
+      })
+    })
+
+    it('returns not-points for ordinary parenthesized expressions', () => {
+      const result = parser.parsePointsSyntax('(x)')
+      expect(result).toEqual({
+        isPoints: false,
+        isMalformed: false,
+        points: [],
+        error: null
+      })
+    })
+
+    it('returns not-points for parenthesized expressions with nested commas', () => {
+      const result = parser.parsePointsSyntax('(max(1, x))')
+      expect(result).toEqual({
+        isPoints: false,
+        isMalformed: false,
+        points: [],
+        error: null
+      })
+    })
+
     it('marks malformed points syntax when shape is invalid', () => {
       const result = parser.parsePointsSyntax('points([1, 2])')
       expect(result.isPoints).toBe(true)

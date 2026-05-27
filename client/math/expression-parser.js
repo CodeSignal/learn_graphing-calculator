@@ -319,6 +319,142 @@ export default class ExpressionParser {
   }
 
   /**
+   * Parse tuple point shorthand - detects (xExpr, yExpr) expressions.
+   * Returns null when the expression is not an entire parenthesized tuple.
+   * @param {string} trimmed - Trimmed expression string to check
+   * @returns {{
+   *   isPoints: boolean,
+   *   isMalformed: boolean,
+   *   points: string[][],
+   *   error: string|null
+   * }|null}
+   */
+  _parseTuplePointSyntax(trimmed) {
+    if (!trimmed.startsWith('(') || !trimmed.endsWith(')')) {
+      return null;
+    }
+
+    let parenDepth = 0;
+    let bracketDepth = 0;
+    let braceDepth = 0;
+    const commaIndexes = [];
+
+    for (let index = 1; index < trimmed.length - 1; index += 1) {
+      const char = trimmed[index];
+
+      if (char === '(') {
+        parenDepth += 1;
+        continue;
+      }
+
+      if (char === ')') {
+        if (parenDepth === 0) {
+          return {
+            isPoints: true,
+            isMalformed: true,
+            points: [],
+            error: 'Invalid points syntax'
+          };
+        }
+        parenDepth -= 1;
+        continue;
+      }
+
+      if (char === '[') {
+        bracketDepth += 1;
+        continue;
+      }
+
+      if (char === ']') {
+        if (bracketDepth === 0) {
+          return {
+            isPoints: true,
+            isMalformed: true,
+            points: [],
+            error: 'Invalid points syntax'
+          };
+        }
+        bracketDepth -= 1;
+        continue;
+      }
+
+      if (char === '{') {
+        braceDepth += 1;
+        continue;
+      }
+
+      if (char === '}') {
+        if (braceDepth === 0) {
+          return {
+            isPoints: true,
+            isMalformed: true,
+            points: [],
+            error: 'Invalid points syntax'
+          };
+        }
+        braceDepth -= 1;
+        continue;
+      }
+
+      if (char === ',' && parenDepth === 0 && bracketDepth === 0 && braceDepth === 0) {
+        commaIndexes.push(index);
+      }
+    }
+
+    if (parenDepth !== 0 || bracketDepth !== 0 || braceDepth !== 0) {
+      return {
+        isPoints: true,
+        isMalformed: true,
+        points: [],
+        error: 'Invalid points syntax'
+      };
+    }
+
+    if (commaIndexes.length === 0) {
+      const inner = trimmed.slice(1, -1).trim();
+      const nestedTupleSyntax = this._parseTuplePointSyntax(inner);
+
+      return nestedTupleSyntax?.isPoints
+        ? {
+            isPoints: true,
+            isMalformed: true,
+            points: [],
+            error: 'Invalid points syntax'
+          }
+        : null;
+    }
+
+    if (commaIndexes.length !== 1) {
+      return {
+        isPoints: true,
+        isMalformed: true,
+        points: [],
+        error: 'Invalid points syntax'
+      };
+    }
+
+    const commaIndex = commaIndexes[0];
+    const lhs = trimmed.slice(1, commaIndex).trim();
+    const rhs = trimmed.slice(commaIndex + 1, -1).trim();
+
+    if (!lhs || !rhs) {
+      return {
+        isPoints: true,
+        isMalformed: true,
+        points: [],
+        error: 'Invalid points syntax'
+      };
+    }
+
+    return {
+      isPoints: true,
+      isMalformed: false,
+      points: [[lhs, rhs]],
+      error: null
+    };
+  }
+
+  /**
    * Parse points syntax - detects points([[x,y], ...]) expressions
    * Returns point coordinate expressions when detected.
    * @param {string} expression - Expression string to check
@@ -336,6 +472,11 @@ export default class ExpressionParser {
 
     const trimmed = expression.trim();
     const pointsCallPattern = /^points\s*\(/;
+    const tupleSyntax = this._parseTuplePointSyntax(trimmed);
+
+    if (tupleSyntax) {
+      return tupleSyntax;
+    }
 
     try {
       const node = math.parse(trimmed);

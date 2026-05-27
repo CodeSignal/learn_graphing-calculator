@@ -84,6 +84,27 @@ describe('ExpressionAdapter', () => {
       expect(latex).toContain('\\leq')
     })
 
+    it('renders tuple point shorthand as LaTeX instead of raw text', () => {
+      const latex = toDisplayLatex('(1, 2)')
+      expect(latex).toContain('\\left(')
+      expect(latex).toContain(',')
+      expect(latex).toContain('\\right)')
+      expect(latex).not.toBe('(1, 2)')
+    })
+
+    it('ignores nested commas when rendering tuple point shorthand', () => {
+      const latex = toDisplayLatex('(max(1, a), b)')
+      expect(latex).toContain('\\max')
+      expect(latex).toContain('b')
+      expect(latex).not.toBe('(max(1, a), b)')
+    })
+
+    it('falls back for malformed tuple point shorthand', () => {
+      expect(toDisplayLatex('(1, 2, 3)')).toBe('(1, 2, 3)')
+      expect(toDisplayLatex('(1,)')).toBe('(1,)')
+      expect(toDisplayLatex('((1, 2))')).toBe('((1, 2))')
+    })
+
     it('falls back to original expression if relation side parse fails', () => {
       expect(toDisplayLatex('x = y +')).toBe('x = y +')
     })

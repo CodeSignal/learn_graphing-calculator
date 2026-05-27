@@ -29,7 +29,8 @@ commands, or architecture.
      requires `x`, optionally `y`; warns on unknown variables). Provides
      `parseAssignmentSyntax()` for pure syntax detection,
      `parseFunctionDefinitionSyntax()` for `f(x) = expr` style detection,
-     `parsePointsSyntax()` for `points([[x,y], ...])`,
+     `parsePointsSyntax()` for `points([[x,y], ...])` and single-point tuple
+     shorthand `(xExpr, yExpr)`,
      `parseVectorSyntax()` for `vector([vx,vy],[ox,oy]?)`, and `isParameter()`
      for parameter detection.
    - Line classification: `math/line-classifier.js` (single source of truth for
@@ -38,8 +39,9 @@ commands, or architecture.
      (explicit/implicit/inequality/points/vector) for mapping to function-plot
      fnType. Supports: explicit (`y = f(x)`, `f(x) = expr`, bare `f(x)`),
      implicit (e.g. `x^2 + y^2 = 1`, `x = expr`), points
-     (`points([[x,y], ...])`), vector (`vector([vx,vy],[ox,oy]?)`), and
-     inequalities (`<`, `<=`, `>`, `>=`) with single-comparator validation.
+     (`(xExpr, yExpr)` or `points([[x,y], ...])`), vector
+     (`vector([vx,vy],[ox,oy]?)`), and inequalities (`<`, `<=`, `>`, `>=`) with
+     single-comparator validation.
      Inequalities now emit `plotData` metadata:
      `{ type: 'inequality', operator, lhs, rhs, boundaryExpression, strict,
      satisfiesPositive }` and set `plotExpression` to `boundaryExpression`.

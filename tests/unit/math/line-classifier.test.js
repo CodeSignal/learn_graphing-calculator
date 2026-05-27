@@ -224,6 +224,26 @@ describe('LineClassifier', () => {
       expect(result.usedVariables).toContain('b')
     })
 
+    it('classifies tuple point shorthand as points graph mode', () => {
+      const result = classifyLine('(1, 2)', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('points')
+      expect(result.error).toBe(null)
+      expect(result.plotExpression).toBe(null)
+      expect(result.plotData).toEqual({
+        type: 'points',
+        points: [['1', '2']]
+      })
+    })
+
+    it('infers parameters from tuple point shorthand coordinates', () => {
+      const result = classifyLine('(a, b)', parser)
+      expect(result.kind).toBe('graph')
+      expect(result.graphMode).toBe('points')
+      expect(result.usedVariables).toContain('a')
+      expect(result.usedVariables).toContain('b')
+    })
+
     it('rejects malformed points syntax', () => {
       const result = classifyLine('points([1, 2])', parser)
       expect(result.kind).toBe('invalid')
@@ -235,6 +255,24 @@ describe('LineClassifier', () => {
       const result = classifyLine('points([[x, 1], [2, 3]])', parser)
       expect(result.kind).toBe('invalid')
       expect(result.error).toBe('Coordinates cannot include x or y')
+    })
+
+    it('rejects tuple point coordinates that include x or y', () => {
+      const result = classifyLine('(x, 1)', parser)
+      expect(result.kind).toBe('invalid')
+      expect(result.error).toBe('Coordinates cannot include x or y')
+    })
+
+    it('rejects malformed tuple point shorthand', () => {
+      const extraComma = classifyLine('(1, 2, 3)', parser)
+      expect(extraComma.kind).toBe('invalid')
+      expect(extraComma.graphMode).toBe(null)
+      expect(extraComma.error).toBeTruthy()
+
+      const emptyCoordinate = classifyLine('(1,)', parser)
+      expect(emptyCoordinate.kind).toBe('invalid')
+      expect(emptyCoordinate.graphMode).toBe(null)
+      expect(emptyCoordinate.error).toBeTruthy()
     })
   })
 

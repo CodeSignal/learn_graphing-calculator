@@ -182,9 +182,10 @@
 
       <h3>Points (scatter)</h3>
       <p>
-        <code>points([[xExpr, yExpr], …])</code> — each pair is a string
-        expression evaluated with your parameters. Do not use <code>x</code> or
-        <code>y</code> inside those coordinate strings. Example:
+        <code>(xExpr, yExpr)</code> plots one point. For multiple points, use
+        <code>points([[xExpr, yExpr], …])</code>. Coordinates are evaluated with
+        your parameters. Do not use <code>x</code> or <code>y</code> inside those
+        coordinate strings. Examples: <code>(a, b)</code> and
         <code>points([[0, 0], [1, 2], [a, b]])</code>.
       </p>
 

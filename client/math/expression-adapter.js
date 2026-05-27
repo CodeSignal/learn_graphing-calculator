@@ -14,6 +14,18 @@ const RELATIONAL_LATEX = {
   '=': '='
 };
 
+const DELIMITER_OPENERS = {
+  '(': 'paren',
+  '[': 'bracket',
+  '{': 'brace'
+};
+
+const DELIMITER_CLOSERS = {
+  ')': 'paren',
+  ']': 'bracket',
+  '}': 'brace'
+};
+
 const readCache = (cache, key) => {
   if (!cache.has(key)) {
     return null;
@@ -86,6 +98,75 @@ const findTopLevelRelation = (expression) => {
   }
 
   return null;
+};
+
+const isTopLevel = (depth) => {
+  return depth.paren === 0 && depth.bracket === 0 && depth.brace === 0;
+};
+
+const updateDelimiterDepth = (depth, char) => {
+  const opened = DELIMITER_OPENERS[char];
+  if (opened) {
+    depth[opened] += 1;
+    return true;
+  }
+
+  const closed = DELIMITER_CLOSERS[char];
+  if (!closed) {
+    return null;
+  }
+
+  if (depth[closed] === 0) {
+    return false;
+  }
+
+  depth[closed] -= 1;
+  return true;
+};
+
+const splitTuplePointParts = (expression) => {
+  if (!expression.startsWith('(') || !expression.endsWith(')')) {
+    return null;
+  }
+
+  const depth = { paren: 0, bracket: 0, brace: 0 };
+  let commaIndex = -1;
+
+  for (let index = 1; index < expression.length - 1; index += 1) {
+    const char = expression[index];
+    const delimiterUpdate = updateDelimiterDepth(depth, char);
+
+    if (delimiterUpdate === false) {
+      return null;
+    }
+
+    if (delimiterUpdate === true) {
+      continue;
+    }
+
+    if (char !== ',' || !isTopLevel(depth)) {
+      continue;
+    }
+
+    if (commaIndex !== -1) {
+      return null;
+    }
+
+    commaIndex = index;
+  }
+
+  if (commaIndex === -1 || !isTopLevel(depth)) {
+    return null;
+  }
+
+  const lhs = expression.slice(1, commaIndex).trim();
+  const rhs = expression.slice(commaIndex + 1, -1).trim();
+
+  if (!lhs || !rhs) {
+    return null;
+  }
+
+  return { lhs, rhs };
 };
 
 const transformForFunctionPlot = (node) => {
@@ -222,6 +303,18 @@ export const toDisplayLatex = (expression) => {
   if (!trimmed) {
     writeCache(displayLatexCache, expression, '');
     return '';
+  }
+
+  const tupleParts = splitTuplePointParts(trimmed);
+  if (tupleParts) {
+    const lhsLatex = convertSideToLatex(tupleParts.lhs);
+    const rhsLatex = convertSideToLatex(tupleParts.rhs);
+
+    if (lhsLatex && rhsLatex) {
+      const tupleLatex = `\\left( ${lhsLatex}, ${rhsLatex} \\right)`;
+      writeCache(displayLatexCache, expression, tupleLatex);
+      return tupleLatex;
+    }
   }
 
   const relation = findTopLevelRelation(trimmed);

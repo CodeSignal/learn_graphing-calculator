@@ -9,7 +9,7 @@ CosmoPlot currently supports the following graphing workflows:
 - Live graphing for explicit expressions such as `sin(x)` and `y = m*x + b`
 - Implicit equations and vertical lines such as `x^2 + y^2 = 9` and `x = 3`
 - Inequality shading such as `y > x^2` and `x <= 3`
-- Point plotting with `points([[0,0],[1,2]])`
+- Point plotting with `(1,2)` shorthand and `points([[0,0],[1,2]])`
 - Vector plotting with `vector([3,2],[1,1])`
 - Parameter assignments such as `a = 2`
 - Auto-generated sliders for parameters used in graph expressions such as
@@ -162,6 +162,7 @@ You may also use `y` for a horizontal reference line. Each annotation must have 
 - Implicit equation: `x^2 + y^2 = 9`
 - Strict inequality: `y > x^2`
 - Inclusive inequality: `x <= 3`
+- Single point: `(1,2)`
 - Points: `points([[0,0],[1,2]])`
 - Vector: `vector([3,2],[1,1])`
 - Parameter assignment: `a = 2`
@@ -229,4 +230,3 @@ The generated `release.tar.gz` contains:
 ```bash
 npm run start:prod
 ```
-

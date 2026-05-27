@@ -12,8 +12,8 @@ alter math behavior.
    - `parseFunctionDefinitionSyntax()`: Detects `FunctionAssignmentNode` syntax,
      i.e. `f(x) = expr` style definitions (returns
      `{isFunctionDef, name, params, body}` without semantic filtering)
-   - `parsePointsSyntax()`: Detects `points([[x,y], ...])` syntax and extracts
-     coordinate expression pairs.
+   - `parsePointsSyntax()`: Detects `points([[x,y], ...])` and single-point
+     tuple shorthand `(xExpr, yExpr)`, then extracts coordinate expression pairs.
    - `parseVectorSyntax()`: Detects `vector([vx,vy],[ox,oy]?)` syntax and
      extracts vector/offset coordinate expressions.
    - `isParameter()`: Detects parameter names (excluding x/y and constants)
@@ -30,6 +30,8 @@ alter math behavior.
      (supports constants, parameters, and y-dependent expressions; rejects if x in RHS)
    - `expr = expr` (both sides non-simple) → `graph`, `graphMode: 'implicit'`
    - Bare `f(x,y)` (both vars) → `graph`, `graphMode: 'implicit'`
+   - `(xExpr, yExpr)` → `graph`, `graphMode: 'points'`, one
+     `plotData.points` pair
    - `points([[x,y], ...])` → `graph`, `graphMode: 'points'`, `plotData.points`
    - `vector([vx,vy],[ox,oy]?)` → `graph`, `graphMode: 'vector'`,
      `plotData.vector`/`plotData.offset` (defaults offset to `['0', '0']`)
@@ -65,7 +67,7 @@ alter math behavior.
   `parseFunctionDefinitionSyntax()` handle pure syntax detection; `classifyLine()`
   applies semantic rules. This separation enables consistent handling of all
   assignment types (`x =`, `y =`, `param =`), function definitions
-  (`f(x) = expr`), and non-function graph payloads (`points(...)`,
+  (`f(x) = expr`), and non-function graph payloads (`(xExpr, yExpr)`, `points(...)`,
   `vector(...)`).
 - LineClassifier enforces graph semantics: graph lines require `x` unless
   written as `y = ...`, `x = ...`, or implicit (both x and y).
