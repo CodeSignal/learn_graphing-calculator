@@ -88,6 +88,9 @@ styling is a last resort.
   `inequalities` contains shading descriptors with compiled
   `evaluate(x, y)` functions. GraphEngine passes these to
   `FunctionPlotRenderer.updateData(data, inequalities)`.
+  Generated function-plot datums also attach SVG `attr` defaults for visibility:
+  scatter points use `r: 6` and stroke width `2`; explicit, implicit, vector,
+  and inequality boundary strokes use stroke width `2.5`.
 
 ## Utilities
 - Line classification lives in `math/line-classifier.js` and is the single

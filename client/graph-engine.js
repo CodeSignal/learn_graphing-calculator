@@ -18,6 +18,8 @@ import FunctionPlotRenderer from './renderers/function-plot-renderer.js';
 
 const VIEWPORT_EPSILON = 1e-9;
 const INEQUALITY_EPSILON = 1e-9;
+const POINT_ATTR = { r: 6, 'stroke-width': 2 };
+const STROKE_ATTR = { 'stroke-width': 2.5 };
 
 export default class GraphEngine {
   constructor(containerId) {
@@ -329,7 +331,8 @@ export default class GraphEngine {
             fnType: 'linear',
             fn: adaptedExpression,
             scope: { ...scope },
-            color: func.color
+            color: func.color,
+            attr: STROKE_ATTR
           };
 
           if (func.derivative && typeof func.derivative === 'object') {
@@ -374,7 +377,8 @@ export default class GraphEngine {
             fnType: 'implicit',
             fn: adaptedExpression,
             scope: { ...scope },
-            color: func.color
+            color: func.color,
+            attr: STROKE_ATTR
           });
           meta.push({ id: func.id });
           break;
@@ -388,7 +392,8 @@ export default class GraphEngine {
             graphType: 'scatter',
             sampler: 'builtIn',
             points,
-            color: func.color
+            color: func.color,
+            attr: POINT_ATTR
           });
           meta.push({ id: func.id });
           break;
@@ -412,7 +417,8 @@ export default class GraphEngine {
             sampler: 'builtIn',
             vector: vectorValues,
             offset: offsetValues,
-            color: func.color
+            color: func.color,
+            attr: STROKE_ATTR
           });
           meta.push({ id: func.id });
           break;
@@ -434,10 +440,11 @@ export default class GraphEngine {
             fn: adaptedBoundary,
             scope: { ...scope },
             color: func.color,
-            skipTip: true
+            skipTip: true,
+            attr: STROKE_ATTR
           };
           if (inequalityData.strict) {
-            boundaryDatum.attr = { 'stroke-dasharray': '6,4' };
+            boundaryDatum.attr = { ...STROKE_ATTR, 'stroke-dasharray': '6,4' };
           }
 
           data.push(boundaryDatum);

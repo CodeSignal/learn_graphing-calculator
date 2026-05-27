@@ -106,12 +106,17 @@ commands, or architecture.
      - For `graphMode: 'points'`, maps to
        `{ fnType: 'points', graphType: 'scatter', sampler: 'builtIn', points }`
        after evaluating coordinate expressions against current parameter scope.
+       Points attach `attr: { r: 6, 'stroke-width': 2 }` so scatter marks stay
+       visible.
      - For `graphMode: 'vector'`, maps to
        `{ fnType: 'vector', graphType: 'polyline', sampler: 'builtIn', vector, offset }`
        after evaluating coordinate expressions against current parameter scope.
+       Explicit, implicit, and vector datums attach
+       `attr: { 'stroke-width': 2.5 }` for readable strokes.
      - For `graphMode: 'inequality'`, maps boundary curves to implicit datums
        (`fnType: 'implicit'`) with `skipTip: true`; strict inequalities use a
-       dashed boundary stroke, inclusive inequalities use solid boundaries.
+       dashed boundary stroke, inclusive inequalities use solid boundaries, and
+       both use `attr` stroke width `2.5`.
        Region shading is rendered by `FunctionPlotRenderer` on a custom canvas
        overlay using the compiled inequality predicates. The renderer caches
        the latest inequality descriptors and repaints shading during zoom/pan

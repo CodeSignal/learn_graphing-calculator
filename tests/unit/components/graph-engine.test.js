@@ -203,13 +203,15 @@ describe('GraphEngine (function-plot migration)', () => {
     expect(data[0]).toMatchObject({
       fnType: 'linear',
       fn: 'x^2',
-      color: '#111'
+      color: '#111',
+      attr: { 'stroke-width': 2.5 }
     })
     expect(meta[0]).toEqual({ id: 'g1' })
     expect(data[1]).toMatchObject({
       fnType: 'linear',
       fn: '4',
-      color: '#444'
+      color: '#444',
+      attr: { 'stroke-width': 2.5 }
     })
     expect(meta[1]).toEqual({ id: 'h1' })
   })
@@ -253,9 +255,9 @@ describe('GraphEngine (function-plot migration)', () => {
       fnType: 'implicit',
       fn: 'x - (3)',
       scope: {},
-      color: '#abc'
+      color: '#abc',
+      attr: { 'stroke-width': 2.5 }
     })
-    expect(data[0]).not.toHaveProperty('attr')
   })
 
   it('normalizes implicit vertical lines before plotting', () => {
@@ -282,7 +284,8 @@ describe('GraphEngine (function-plot migration)', () => {
       fnType: 'implicit',
       fn: '(x^2 + y^2) - (1)',
       scope: {},
-      color: '#f00'
+      color: '#f00',
+      attr: { 'stroke-width': 2.5 }
     })
   })
 
@@ -306,7 +309,8 @@ describe('GraphEngine (function-plot migration)', () => {
       fnType: 'implicit',
       fn: '(x^2 + y^2) - (r)',
       scope: { r: 2 },
-      color: '#f00'
+      color: '#f00',
+      attr: { 'stroke-width': 2.5 }
     })
   })
 
@@ -323,7 +327,8 @@ describe('GraphEngine (function-plot migration)', () => {
       graphType: 'scatter',
       sampler: 'builtIn',
       points: [[0, 0], [1, 4]],
-      color: '#08f'
+      color: '#08f',
+      attr: { r: 6, 'stroke-width': 2 }
     })
     expect(meta).toEqual([{ id: 'p1' }])
   })
@@ -359,7 +364,8 @@ describe('GraphEngine (function-plot migration)', () => {
       sampler: 'builtIn',
       vector: [3, 2],
       offset: [0, 0],
-      color: '#0b4'
+      color: '#0b4',
+      attr: { 'stroke-width': 2.5 }
     })
   })
 
@@ -409,9 +415,9 @@ describe('GraphEngine (function-plot migration)', () => {
       fn: '(y) - (x^2)',
       scope: {},
       color: '#00f',
-      skipTip: true
+      skipTip: true,
+      attr: { 'stroke-width': 2.5, 'stroke-dasharray': '6,4' }
     })
-    expect(data[0].attr).toEqual({ 'stroke-dasharray': '6,4' })
 
     expect(inequalities).toHaveLength(1)
     expect(inequalities[0]).toMatchObject({
@@ -434,7 +440,7 @@ describe('GraphEngine (function-plot migration)', () => {
 
     expect(data).toHaveLength(1)
     expect(data[0].fnType).toBe('implicit')
-    expect(data[0].attr).toBeUndefined()
+    expect(data[0].attr).toEqual({ 'stroke-width': 2.5 })
     expect(inequalities).toHaveLength(1)
     expect(inequalities[0].strict).toBe(false)
     expect(inequalities[0].satisfiesPositive).toBe(false)
