@@ -19,7 +19,9 @@ export default class ParameterSlider {
      * @param {HTMLElement} container - Container element to mount slider
      * @param {string} paramName - Parameter name (e.g., 'a')
      * @param {Object} initialConfig - Initial config {value, min, max, step}
-     * @param {Object} callbacks - Callbacks {onChange: ({oldValue, newValue, isDiscrete, paramName}) => void}
+     * @param {Object} callbacks - Callbacks:
+     *   onLiveChange({oldValue, newValue, paramName, isDragging}) for live UI sync
+     *   onChange({oldValue, newValue, isDiscrete, paramName}) for commit logging
      */
     constructor(container, paramName, initialConfig, callbacks = {}) {
         this.container = container;
@@ -109,8 +111,8 @@ export default class ParameterSlider {
             value: config.value,
             showInputs: false,
             continuousUpdates: true,
-            onChange: (newValue) => {
-                this.handleSliderChange(newValue);
+            onChange: (newValue, source) => {
+                this.handleSliderChange(newValue, source);
             }
         });
     }
@@ -118,8 +120,9 @@ export default class ParameterSlider {
     /**
      * Handle slider value change
      * @param {number} newValue - New slider value
+     * @param {string|null} source - NumericSlider interaction source
      */
-    handleSliderChange(newValue) {
+    handleSliderChange(newValue, source = null) {
         const currentConfig = this.getParameterConfig(this.paramName);
         const previousValue = this.getStoredParameterValue(currentConfig.value);
         const roundedValue = this.roundToStep(newValue, currentConfig.step);
@@ -131,10 +134,11 @@ export default class ParameterSlider {
 
         // Track slider interaction for commit-boundary logging
         const isDragging = this.slider.isDragging;
+        const isDragEnd = !isDragging && !this.sliderInteractionActive && source !== null;
 
         // Capture old value BEFORE state update (for discrete changes)
         let oldValueForDiscrete = null;
-        if (!isDragging && !this.sliderInteractionActive) {
+        if (!isDragging && !this.sliderInteractionActive && !isDragEnd) {
             // Discrete change - capture old value before update
             oldValueForDiscrete = previousValue;
         }
@@ -146,12 +150,13 @@ export default class ParameterSlider {
         }
 
         if (previousValue !== nextConfig.value) {
+            this.emitLiveChange(previousValue, nextConfig.value, isDragging);
             this.publishParameterUpdate(nextConfig.value);
         }
 
         // Emit onChange callback on interaction end (drag end) or discrete change (non-drag)
         if (!isDragging) {
-            if (this.sliderInteractionActive) {
+            if (this.sliderInteractionActive || isDragEnd) {
                 // Drag ended - emit once with start -> end
                 const oldValue = this.sliderEditStartValue !== null
                     ? this.sliderEditStartValue
@@ -179,6 +184,17 @@ export default class ParameterSlider {
             }
         }
         // While dragging (isDragging === true), do not emit - wait for drag end
+    }
+
+    emitLiveChange(oldValue, newValue, isDragging = false) {
+        if (!this.callbacks.onLiveChange) return;
+
+        this.callbacks.onLiveChange({
+            oldValue,
+            newValue,
+            isDragging,
+            paramName: this.paramName
+        });
     }
 
     /**
@@ -427,16 +443,16 @@ export default class ParameterSlider {
         this.syncSliderSettingsInputs(next);
 
         // If value changed, trigger onChange callback for expression update
-        if (next.value !== previousValue && this.callbacks.onChange) {
-            this.callbacks.onChange({
-                oldValue: previousValue,
-                newValue: next.value,
-                isDiscrete: true,
-                paramName: this.paramName
-            });
-        }
-
         if (next.value !== previousValue) {
+            this.emitLiveChange(previousValue, next.value, false);
+            if (this.callbacks.onChange) {
+                this.callbacks.onChange({
+                    oldValue: previousValue,
+                    newValue: next.value,
+                    isDiscrete: true,
+                    paramName: this.paramName
+                });
+            }
             this.publishParameterUpdate(next.value);
         }
 
@@ -467,16 +483,16 @@ export default class ParameterSlider {
         this.syncSliderSettingsInputs(next);
 
         // If value changed, trigger onChange callback for expression update
-        if (next.value !== previousValue && this.callbacks.onChange) {
-            this.callbacks.onChange({
-                oldValue: previousValue,
-                newValue: next.value,
-                isDiscrete: true,
-                paramName: this.paramName
-            });
-        }
-
         if (next.value !== previousValue) {
+            this.emitLiveChange(previousValue, next.value, false);
+            if (this.callbacks.onChange) {
+                this.callbacks.onChange({
+                    oldValue: previousValue,
+                    newValue: next.value,
+                    isDiscrete: true,
+                    paramName: this.paramName
+                });
+            }
             this.publishParameterUpdate(next.value);
         }
 

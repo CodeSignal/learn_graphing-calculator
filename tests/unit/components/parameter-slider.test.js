@@ -57,12 +57,14 @@ vi.mock('../../../client/core/event-bus.js', () => {
 describe('ParameterSlider', () => {
   let container
   let onChangeCallback
+  let onLiveChangeCallback
 
   beforeEach(() => {
     // Create container element
     container = document.createElement('div')
     document.body.appendChild(container)
     onChangeCallback = vi.fn()
+    onLiveChangeCallback = vi.fn()
 
     // Reset mock state
     mockState.parameters = {}
@@ -376,13 +378,17 @@ describe('ParameterSlider', () => {
         container,
         'a',
         { value: 5, min: 0, max: 10, step: 1 },
-        { onChange: onChangeCallback }
+        {
+          onLiveChange: onLiveChangeCallback,
+          onChange: onChangeCallback
+        }
       )
       EventBus.publish.mockClear()
 
       slider.handleSliderChange(5)
 
       expect(EventBus.publish).not.toHaveBeenCalledWith('parameters:updated', expect.anything())
+      expect(onLiveChangeCallback).not.toHaveBeenCalled()
       slider.destroy()
     })
 
@@ -400,6 +406,96 @@ describe('ParameterSlider', () => {
       slider.handleSliderChange(1)
 
       expect(EventBus.publish).toHaveBeenCalledWith('parameters:updated', { a: 1 })
+      slider.destroy()
+    })
+
+    it('emits live updates and parameter publish during drag without commit callback', () => {
+      mockState.parameters.a = { value: 5, min: 0, max: 10, step: 1 }
+      const slider = new ParameterSlider(
+        container,
+        'a',
+        { value: 5, min: 0, max: 10, step: 1 },
+        {
+          onLiveChange: onLiveChangeCallback,
+          onChange: onChangeCallback
+        }
+      )
+      EventBus.publish.mockClear()
+
+      slider.slider.isDragging = true
+      slider.handleSliderChange(7, 'single')
+
+      expect(onLiveChangeCallback).toHaveBeenCalledWith({
+        oldValue: 5,
+        newValue: 7,
+        isDragging: true,
+        paramName: 'a'
+      })
+      expect(EventBus.publish).toHaveBeenCalledWith('parameters:updated', { a: 7 })
+      expect(onChangeCallback).not.toHaveBeenCalled()
+
+      slider.destroy()
+    })
+
+    it('emits one commit callback with drag start and end values', () => {
+      mockState.parameters.a = { value: 5, min: 0, max: 10, step: 1 }
+      const slider = new ParameterSlider(
+        container,
+        'a',
+        { value: 5, min: 0, max: 10, step: 1 },
+        {
+          onLiveChange: onLiveChangeCallback,
+          onChange: onChangeCallback
+        }
+      )
+
+      slider.slider.isDragging = true
+      slider.handleSliderChange(7, 'single')
+      slider.slider.isDragging = false
+      slider.handleSliderChange(7, 'single')
+
+      expect(onChangeCallback).toHaveBeenCalledTimes(1)
+      expect(onChangeCallback).toHaveBeenCalledWith({
+        oldValue: 5,
+        newValue: 7,
+        isDiscrete: false,
+        paramName: 'a'
+      })
+
+      slider.destroy()
+    })
+
+    it('live-syncs and publishes final drag value missed by throttling', () => {
+      mockState.parameters.a = { value: 5, min: 0, max: 10, step: 1 }
+      const slider = new ParameterSlider(
+        container,
+        'a',
+        { value: 5, min: 0, max: 10, step: 1 },
+        {
+          onLiveChange: onLiveChangeCallback,
+          onChange: onChangeCallback
+        }
+      )
+      EventBus.publish.mockClear()
+
+      slider.slider.isDragging = false
+      slider.handleSliderChange(8, 'single')
+
+      expect(onLiveChangeCallback).toHaveBeenCalledWith({
+        oldValue: 5,
+        newValue: 8,
+        isDragging: false,
+        paramName: 'a'
+      })
+      expect(EventBus.publish).toHaveBeenCalledWith('parameters:updated', { a: 8 })
+      expect(onChangeCallback).toHaveBeenCalledTimes(1)
+      expect(onChangeCallback).toHaveBeenCalledWith({
+        oldValue: 5,
+        newValue: 8,
+        isDiscrete: false,
+        paramName: 'a'
+      })
+
       slider.destroy()
     })
 

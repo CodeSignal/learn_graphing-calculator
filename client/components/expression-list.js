@@ -482,20 +482,54 @@ export default class ExpressionList {
         return true; // Conversion happened, should return early
     }
 
+    formatParameterAssignment(paramName, value) {
+        const paramConfig = StateManager.get(`parameters.${paramName}`) || {};
+        const step = paramConfig.step || DEFAULT_PARAMETER.step;
+        return `${paramName} = ${formatParameterValue(value, step)}`;
+    }
+
+    syncSliderAssignmentExpression(func, item, paramName, value) {
+        const newExpr = this.formatParameterAssignment(paramName, value);
+        const functions = [...(StateManager.get('functions') || [])];
+        const index = functions.findIndex(f => f.id === func.id);
+
+        if (index !== -1 && functions[index].expression !== newExpr) {
+            functions[index] = {
+                ...functions[index],
+                expression: newExpr,
+                ...this.getClassificationMetadata(newExpr)
+            };
+            StateManager.set('functions', functions, { silent: true });
+        }
+
+        if (item.inputEl) {
+            item.inputEl.value = newExpr;
+        }
+
+        item.lastExpression = newExpr;
+        this.updateLatexDisplay(item, newExpr);
+        this.updateItemSection(item, newExpr);
+        this.applySectionFilter();
+
+        return newExpr;
+    }
+
+    createSliderLiveChangeHandler(func, item) {
+        return ({ newValue, paramName: pName }) => {
+            this.syncSliderAssignmentExpression(func, item, pName, newValue);
+        };
+    }
+
     createSliderChangeHandler(func, item) {
         return ({ oldValue, newValue, paramName: pName }) => {
             const paramConfig = StateManager.get(`parameters.${pName}`) || {};
             const step = paramConfig.step || DEFAULT_PARAMETER.step;
             const oldExpr = `${pName} = ${formatParameterValue(oldValue, step)}`;
-            const newExpr = `${pName} = ${formatParameterValue(newValue, step)}`;
+            const newExpr = this.syncSliderAssignmentExpression(func, item, pName, newValue);
 
-            this.updateExpression(func.id, newExpr);
-
-            if (item.inputEl) {
-                item.inputEl.value = newExpr;
+            if (oldExpr !== newExpr) {
+                this.logModified(func.id, oldExpr, newExpr, { paramName: pName });
             }
-
-            this.logModified(func.id, oldExpr, newExpr, { paramName: pName });
         };
     }
 
@@ -537,7 +571,10 @@ export default class ExpressionList {
                 item.sliderContainer,
                 paramName,
                 { value },
-                { onChange: this.createSliderChangeHandler(func, item) }
+                {
+                    onLiveChange: this.createSliderLiveChangeHandler(func, item),
+                    onChange: this.createSliderChangeHandler(func, item)
+                }
             );
         } else if (item.parameterSlider.paramName !== paramName) {
             // Parameter name changed - destroy old and create new
@@ -546,7 +583,10 @@ export default class ExpressionList {
                 item.sliderContainer,
                 paramName,
                 { value },
-                { onChange: this.createSliderChangeHandler(func, item) }
+                {
+                    onLiveChange: this.createSliderLiveChangeHandler(func, item),
+                    onChange: this.createSliderChangeHandler(func, item)
+                }
             );
         }
 

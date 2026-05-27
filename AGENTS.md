@@ -69,6 +69,13 @@ commands, or architecture.
      `+ Add Expression` in `f(x)` and `+ Add Parameter` in `θ`. Rendered
      expression boxes use auto-height KaTeX display with horizontal scrolling
      for wide formulas so tall matrices/fractions are not clipped.
+    Slider-driven assignment changes are split into live sync and commit
+    logging: `ParameterSlider` emits `onLiveChange` for every effective value
+    change so ExpressionList can silently update the assignment row text/LaTeX
+    with `StateManager.set('functions', ..., { silent: true })`, while
+    `onChange` remains the one-shot commit callback for activity logging.
+    Graph redraws for slider movement come from `parameters:updated`, not from
+    `state:changed:functions`.
   - `components/sidebar-manager.js` handles resize/toggle.
    - `graph-engine.js` orchestrates render updates and delegates chart drawing
      to `renderers/function-plot-renderer.js`. Plot display uses function-plot
@@ -163,6 +170,10 @@ commands, or architecture.
   semantic assignment ids instead of duplicating collision logic.
   `points` and `vector` are reserved function names and must not be inferred as
   parameter symbols.
+  Slider edits must keep live assignment text in sync without driving graph
+  renders from `functions`: use silent function-state updates for the assignment
+  row, publish `parameters:updated` for the numeric value, and log only from the
+  slider commit callback.
   The inline composer's show/hide behavior relies on native `hidden` plus an
   explicit `.expression-parameter-composer[hidden]` CSS rule.
 - **Expression adaptation**: Before passing `plotExpression` to function-plot,

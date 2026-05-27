@@ -66,8 +66,9 @@ styling is a last resort.
   expressions (e.g., `a = 1.0`). Owns slider DOM structure, wraps
   NumericSlider from design system, handles parameter config normalization,
   value formatting, settings panel (min/max/step), and interaction tracking for
-  commit-boundary logging. Emits onChange callbacks with old/new values for
-  ExpressionList to handle expression updates and logging.
+  commit-boundary logging. Emits `onLiveChange` callbacks for every effective
+  value change so ExpressionList can silently sync assignment text/LaTeX, and
+  emits `onChange` callbacks once per completed interaction for logging.
 - `renderers/function-plot-renderer.js`: Adapter over `function-plot` that owns
   chart init/rebuild/draw and forwards zoom events. Uses function-plot native
   axis ticks/labels, grid via options, and on-curve tip (crosshairs + tooltip).
@@ -164,11 +165,15 @@ styling is a last resort.
     and compares old vs new on commit.
   - **Slider edits**: ParameterSlider tracks interaction state and emits
     onChange callbacks with `{oldValue, newValue, isDiscrete, paramName}`.
-    ExpressionList receives these callbacks, formats values into expressions,
-    updates state, and logs the change. For drag interactions, ParameterSlider
-    captures the start value and emits once on drag end. For discrete changes
-    (track click/keyboard), it emits immediately. During drag, intermediate
-    values update state but do not trigger logs.
+    ExpressionList receives `onLiveChange`, formats values into expressions,
+    and silently updates the assignment row in `functions` plus the visible
+    input/LaTeX display. These live assignment syncs must use
+    `StateManager.set('functions', next, { silent: true })`; graph renders come
+    from `parameters:updated`, not `state:changed:functions`. For drag
+    interactions, ParameterSlider captures the start value and emits `onChange`
+    once on drag end. For discrete changes (track click/keyboard), it emits
+    immediately. During drag, intermediate values update state/display but do
+    not trigger logs.
 - Log messages:
   - Create: `Created expression ${id}`
   - Modify (text): `Modified expression ${id}: ${oldExpression} ->

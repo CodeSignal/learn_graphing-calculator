@@ -55,9 +55,11 @@ vi.mock('../../../client/utils/logger.js', () => ({
 
 vi.mock('../../../client/components/parameter-slider.js', () => ({
   default: class MockParameterSlider {
-    constructor(container, paramName) {
+    constructor(container, paramName, initialConfig, callbacks = {}) {
       this.container = container
       this.paramName = paramName
+      this.initialConfig = initialConfig
+      this.callbacks = callbacks
       this.updateConfig = vi.fn()
       this.destroy = vi.fn()
     }
@@ -66,6 +68,8 @@ vi.mock('../../../client/components/parameter-slider.js', () => ({
 
 import ExpressionList from '../../../client/components/expression-list.js'
 import EventBus from '../../../client/core/event-bus.js'
+import StateManager from '../../../client/core/state-manager.js'
+import Logger from '../../../client/utils/logger.js'
 
 describe('ExpressionList', () => {
   beforeEach(() => {
@@ -313,5 +317,90 @@ describe('ExpressionList', () => {
     expressionList.setActiveSection('parameters')
     expect(pointsItem.element.hidden).toBe(true)
     expect(assignmentItem.element.hidden).toBe(false)
+  })
+
+  it('live-syncs slider assignment text without activity logging', () => {
+    const expressionList = new ExpressionList('expression-list', 'btn-add-expression')
+    const func = { id: 'param_a', expression: 'a = 1', color: '#222', visible: true }
+    mockState.functions = [func]
+    mockState.parameters = { a: { value: 2.5, min: 0, max: 10, step: 0.1 } }
+    expressionList.init()
+    expressionList.render(mockState.functions)
+
+    const item = expressionList.renderedItems.get('param_a')
+    StateManager.set.mockClear()
+    Logger.logActivity.mockClear()
+
+    item.parameterSlider.callbacks.onLiveChange({
+      oldValue: 1,
+      newValue: 2.5,
+      isDragging: true,
+      paramName: 'a'
+    })
+
+    expect(mockState.functions[0].expression).toBe('a = 2.5')
+    expect(item.inputEl.value).toBe('a = 2.5')
+    expect(item.latexEl.getAttribute('title')).toBe('a = 2.5')
+    expect(item.latexEl.getAttribute('aria-label')).toBe('a = 2.5')
+    expect(Logger.logActivity).not.toHaveBeenCalled()
+  })
+
+  it('logs slider commit once after live assignment sync', () => {
+    const expressionList = new ExpressionList('expression-list', 'btn-add-expression')
+    const func = { id: 'param_a', expression: 'a = 1', color: '#222', visible: true }
+    mockState.functions = [func]
+    mockState.parameters = { a: { value: 2.5, min: 0, max: 10, step: 0.1 } }
+    expressionList.init()
+    expressionList.render(mockState.functions)
+
+    const item = expressionList.renderedItems.get('param_a')
+    Logger.logActivity.mockClear()
+
+    item.parameterSlider.callbacks.onLiveChange({
+      oldValue: 1,
+      newValue: 2.5,
+      isDragging: true,
+      paramName: 'a'
+    })
+    item.parameterSlider.callbacks.onChange({
+      oldValue: 1,
+      newValue: 2.5,
+      isDiscrete: false,
+      paramName: 'a'
+    })
+
+    expect(Logger.logActivity).toHaveBeenCalledTimes(1)
+    expect(Logger.logActivity).toHaveBeenCalledWith(
+      'Modified expression param_a (parameter: a): a = 1.0 -> a = 2.5'
+    )
+  })
+
+  it('uses silent function state updates for slider assignment sync', () => {
+    const expressionList = new ExpressionList('expression-list', 'btn-add-expression')
+    const func = { id: 'param_a', expression: 'a = 1', color: '#222', visible: true }
+    mockState.functions = [func]
+    mockState.parameters = { a: { value: 2, min: 0, max: 10, step: 1 } }
+    expressionList.init()
+    expressionList.render(mockState.functions)
+
+    const item = expressionList.renderedItems.get('param_a')
+    StateManager.set.mockClear()
+
+    item.parameterSlider.callbacks.onLiveChange({
+      oldValue: 1,
+      newValue: 2,
+      isDragging: true,
+      paramName: 'a'
+    })
+
+    expect(StateManager.set).toHaveBeenCalledWith(
+      'functions',
+      expect.any(Array),
+      { silent: true }
+    )
+    expect(EventBus.publish).not.toHaveBeenCalledWith(
+      'state:changed:functions',
+      expect.anything()
+    )
   })
 })
