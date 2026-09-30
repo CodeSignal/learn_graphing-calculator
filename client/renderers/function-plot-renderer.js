@@ -2,6 +2,12 @@ import functionPlot from 'function-plot';
 
 const INEQUALITY_SAMPLE_STEP = 3;
 const INEQUALITY_SHADE_ALPHA = 0.18;
+// Vertical-line datums extend this fraction of the visible height past each edge.
+const VERTICAL_LINE_OVERSCAN = 0.05;
+// A jump between consecutive samples larger than this many typical steps is a domain gap.
+const POLYLINE_GAP_FACTOR = 3;
+// Polyline samples are clamped to the visible y-domain plus this many heights on each side.
+const POLYLINE_CLAMP_HEIGHTS = 1;
 
 /**
  * Thin adapter around function-plot so GraphEngine stays focused on
@@ -83,10 +89,119 @@ export default class FunctionPlotRenderer {
           this.callbacks.onZoom(viewport);
         }
         this.scheduleInequalityRender();
+      },
+      // Fired at the start of every chart.draw() (data updates, rebuilds, zoom/pan frames).
+      'before:draw': () => {
+        this.syncVerticalLines();
+      },
+      // Fired by function-plot after sampling a datum and before its graph type draws the
+      // samples, so the sample groups can still be adjusted in place.
+      eval: (groups, index, isHelper) => {
+        if (isHelper) return;
+        const datum = this.options?.data?.[index];
+        if (datum?.graphType === 'polyline' && datum.fnType === 'linear') {
+          this.normalizePolylineSamples(groups);
+        }
       }
     };
 
-    this.chart.on('zoom', this.boundHandlers.zoom);
+    Object.entries(this.boundHandlers).forEach(([eventName, handler]) => {
+      this.chart.on(eventName, handler);
+    });
+  }
+
+  getVisibleYRange() {
+    const domain = this.chart?.meta?.yScale?.domain?.();
+    if (!Array.isArray(domain) || !Number.isFinite(domain[0]) || !Number.isFinite(domain[1])) {
+      return null;
+    }
+
+    const lo = Math.min(domain[0], domain[1]);
+    const hi = Math.max(domain[0], domain[1]);
+    return hi > lo ? { lo, hi } : null;
+  }
+
+  /**
+   * Re-fit datums flagged with `verticalLineX` (vertical inequality boundaries) to the visible
+   * y-domain. A two-point polyline stays dashable at any zoom, while a fixed "very long" line
+   * would either end on screen after zooming out or exceed browser dash limits when zoomed in.
+   */
+  syncVerticalLines() {
+    const data = this.options?.data;
+    if (!Array.isArray(data)) return;
+
+    const range = this.getVisibleYRange();
+    if (!range) return;
+
+    const overscan = (range.hi - range.lo) * VERTICAL_LINE_OVERSCAN;
+    data.forEach((datum) => {
+      if (!Number.isFinite(datum?.verticalLineX)) return;
+      datum.points = [
+        [datum.verticalLineX, range.lo - overscan],
+        [datum.verticalLineX, range.hi + overscan]
+      ];
+    });
+  }
+
+  /**
+   * Adjust builtIn polyline samples (`[[x, y], ...]` groups) for explicit boundary curves:
+   * - split groups where samples are missing (NaN outside the domain, e.g. sqrt(x^2 - 4) on
+   *   -2 < x < 2); function-plot would otherwise draw a straight segment across the gap;
+   * - clamp y to a band around the visible domain. The on-screen shape is unchanged, but
+   *   steep curves (e.g. y > e^x) no longer produce paths millions of pixels long, which
+   *   browsers stop dashing (Skia gives up at about a million dashes).
+   */
+  normalizePolylineSamples(groups) {
+    if (!Array.isArray(groups)) return;
+
+    for (let groupIndex = groups.length - 1; groupIndex >= 0; groupIndex -= 1) {
+      const pieces = this.splitAtSampleGaps(groups[groupIndex]);
+      if (pieces) {
+        groups.splice(groupIndex, 1, ...pieces);
+      }
+    }
+
+    const range = this.getVisibleYRange();
+    if (!range) return;
+
+    const band = (range.hi - range.lo) * POLYLINE_CLAMP_HEIGHTS;
+    const yLo = range.lo - band;
+    const yHi = range.hi + band;
+    groups.forEach((group) => {
+      if (!Array.isArray(group)) return;
+      group.forEach((point) => {
+        if (Array.isArray(point) && Number.isFinite(point[1])) {
+          point[1] = Math.min(Math.max(point[1], yLo), yHi);
+        }
+      });
+    });
+  }
+
+  splitAtSampleGaps(group) {
+    if (!Array.isArray(group) || group.length < 3) return null;
+
+    const steps = [];
+    for (let i = 1; i < group.length; i += 1) {
+      steps.push(group[i][0] - group[i - 1][0]);
+    }
+
+    // Samples are evenly spaced, so the median step is the sampling step. Asymptote handling
+    // can move a group's end points by up to one step, which stays below the gap factor.
+    const typicalStep = [...steps].sort((a, b) => a - b)[Math.floor(steps.length / 2)];
+    if (!(typicalStep > 0)) return null;
+
+    const pieces = [];
+    let start = 0;
+    steps.forEach((step, i) => {
+      if (step > typicalStep * POLYLINE_GAP_FACTOR) {
+        pieces.push(group.slice(start, i + 1));
+        start = i + 1;
+      }
+    });
+
+    if (pieces.length === 0) return null;
+    pieces.push(group.slice(start));
+    return pieces;
   }
 
   updateData(data, inequalities = []) {
@@ -330,7 +445,9 @@ export default class FunctionPlotRenderer {
     this.cancelScheduledInequalityRender();
 
     if (this.chart && this.boundHandlers) {
-      this.chart.removeListener('zoom', this.boundHandlers.zoom);
+      Object.entries(this.boundHandlers).forEach(([eventName, handler]) => {
+        this.chart.removeListener(eventName, handler);
+      });
     }
 
     if (this.chart) {

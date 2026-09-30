@@ -52,10 +52,10 @@ function createMockChart(options) {
     removeAllListeners: vi.fn(),
     draw: vi.fn(),
     build: vi.fn(() => chart),
-    emitForTest: (eventName, payload) => {
+    emitForTest: (eventName, ...args) => {
       const handler = listeners.get(eventName)
       if (handler) {
-        handler(payload)
+        handler(...args)
       }
     },
     setDomainsForTest: (x, y) => {
@@ -437,6 +437,81 @@ describe('FunctionPlotRenderer', () => {
     expect(chart.options.grid).toBe(false)
   })
 
+  describe('boundary polylines', () => {
+    const initRenderer = () => {
+      const renderer = new FunctionPlotRenderer(container)
+      renderer.init({
+        width: 500,
+        height: 400,
+        viewport: { xMin: -10, xMax: 10, yMin: -10, yMax: 10 },
+        showGrid: true,
+        onZoom: vi.fn()
+      })
+      return renderer
+    }
+
+    it('re-fits vertical-line datums to the visible y-domain before each draw', () => {
+      const renderer = initRenderer()
+      const vertical = {
+        fnType: 'points',
+        graphType: 'polyline',
+        verticalLineX: 2,
+        points: [[2, 0], [2, 1]]
+      }
+      const other = { fnType: 'points', graphType: 'polyline', points: [[0, 0], [1, 1]] }
+      renderer.updateData([vertical, other])
+
+      const chart = renderer.chart
+      chart.emitForTest('before:draw')
+      expect(vertical.points).toEqual([[2, -11], [2, 11]])
+
+      chart.setDomainsForTest([-4, 4], [-2, 6])
+      chart.emitForTest('before:draw')
+      expect(vertical.points[0][0]).toBe(2)
+      expect(vertical.points[0][1]).toBeCloseTo(-2.4)
+      expect(vertical.points[1][1]).toBeCloseTo(6.4)
+      expect(other.points).toEqual([[0, 0], [1, 1]])
+    })
+
+    it('splits explicit polyline samples at domain gaps and clamps far-off values', () => {
+      const renderer = initRenderer()
+      renderer.updateData([
+        { fnType: 'linear', graphType: 'polyline', fn: 'sqrt(x^2 - 4)' }
+      ])
+
+      const groups = [[
+        [-4, 3.46], [-3, 2.24], [-2, 0],
+        [2, 0], [3, 2.24], [4, 1e9]
+      ]]
+      renderer.chart.emitForTest('eval', groups, 0, false)
+
+      expect(groups).toEqual([
+        [[-4, 3.46], [-3, 2.24], [-2, 0]],
+        [[2, 0], [3, 2.24], [4, 30]]
+      ])
+    })
+
+    it('does not split evenly spaced samples or touch non-polyline and helper samples', () => {
+      const renderer = initRenderer()
+      renderer.updateData([
+        { fnType: 'linear', graphType: 'polyline', fn: 'x' },
+        { fnType: 'linear', fn: 'x^9' }
+      ])
+
+      const even = [[[-1, -1], [0, 0], [1, 1], [2, 2]]]
+      renderer.chart.emitForTest('eval', even, 0, false)
+      expect(even).toEqual([[[-1, -1], [0, 0], [1, 1], [2, 2]]])
+
+      const interval = [[[-1, 1e9], [5, 1e9]]]
+      renderer.chart.emitForTest('eval', interval, 1, false)
+      expect(interval).toEqual([[[-1, 1e9], [5, 1e9]]])
+
+      const helper = [[[-1, 1e9], [5, 1e9]]]
+      renderer.chart.emitForTest('eval', helper, 0, true)
+      expect(helper).toEqual([[[-1, 1e9], [5, 1e9]]])
+    })
+  })
+
   it('destroys listeners and clears cache/container state', () => {
     const renderer = new FunctionPlotRenderer(container)
 
@@ -455,7 +530,8 @@ describe('FunctionPlotRenderer', () => {
 
     renderer.destroy()
 
-    expect(chart.removeListener).toHaveBeenCalledTimes(1)
+    const removedEvents = chart.removeListener.mock.calls.map(([eventName]) => eventName)
+    expect(removedEvents.sort()).toEqual(['before:draw', 'eval', 'zoom'])
     expect(chart.removeAllListeners).toHaveBeenCalledTimes(1)
     expect(chartCache[chartId]).toBeUndefined()
     expect(container.innerHTML).toBe('')

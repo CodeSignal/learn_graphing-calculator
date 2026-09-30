@@ -24,6 +24,16 @@ const mockState = {
 const listeners = new Map()
 const rendererInstances = []
 const compact = (value) => value.replace(/\s+/g, '')
+const DASHED_BOUNDARY_ATTR = {
+  'stroke-width': 2.5,
+  'stroke-linecap': 'butt',
+  'stroke-dasharray': '6,4'
+}
+const SOLID_BOUNDARY_ATTR = {
+  'stroke-width': 2.5,
+  'stroke-linecap': 'butt',
+  'stroke-dasharray': 'none'
+}
 
 function getByPath(root, path) {
   if (!path) return root
@@ -401,7 +411,7 @@ describe('GraphEngine (function-plot migration)', () => {
     expect(vector.data).toHaveLength(0)
   })
 
-  it('maps inequalities to implicit boundary data and shading descriptors', () => {
+  it('maps inequalities to explicit boundary data and shading descriptors', () => {
     const engine = new GraphEngine('graph-canvas')
 
     const { data, meta, inequalities } = engine.mapFunctionsToPlotData([
@@ -410,13 +420,15 @@ describe('GraphEngine (function-plot migration)', () => {
 
     expect(data).toHaveLength(1)
     expect(meta).toEqual([{ id: 'i1' }])
-    expect(data[0]).toMatchObject({
-      fnType: 'implicit',
-      fn: '(y) - (x^2)',
+    expect(data[0]).toEqual({
+      fnType: 'linear',
+      graphType: 'polyline',
+      sampler: 'builtIn',
+      fn: 'x^2',
       scope: {},
       color: '#00f',
       skipTip: true,
-      attr: { 'stroke-width': 2.5, 'stroke-dasharray': '6,4' }
+      attr: DASHED_BOUNDARY_ATTR
     })
 
     expect(inequalities).toHaveLength(1)
@@ -440,12 +452,193 @@ describe('GraphEngine (function-plot migration)', () => {
 
     expect(data).toHaveLength(1)
     expect(data[0].fnType).toBe('implicit')
-    expect(data[0].attr).toEqual({ 'stroke-width': 2.5 })
+    expect(data[0].attr).toEqual(SOLID_BOUNDARY_ATTR)
     expect(inequalities).toHaveLength(1)
     expect(inequalities[0].strict).toBe(false)
     expect(inequalities[0].satisfiesPositive).toBe(false)
     expect(inequalities[0].evaluate(1, 1)).toBe(true)
     expect(inequalities[0].evaluate(5, 5)).toBe(false)
+  })
+
+  describe('inequality boundary dash style', () => {
+    const mapSingle = (expression, scope = {}) => {
+      const engine = new GraphEngine('graph-canvas')
+      const { data, meta, inequalities } = engine.mapFunctionsToPlotData([
+        { id: 'b1', expression, color: '#c0f', visible: true }
+      ], scope)
+      expect(data).toHaveLength(1)
+      expect(meta).toEqual([{ id: 'b1' }])
+      expect(inequalities).toHaveLength(1)
+      return { datum: data[0], inequality: inequalities[0] }
+    }
+
+    it.each([
+      ['y > 2x - 1', '2x - 1'],
+      ['y < 3 - x', '3 - x'],
+      ['2x - 1 < y', '2x - 1']
+    ])('renders strict linear boundary %s as a dashed explicit polyline', (expression, fn) => {
+      const { datum } = mapSingle(expression)
+
+      expect(datum).toEqual({
+        fnType: 'linear',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        fn,
+        scope: {},
+        color: '#c0f',
+        skipTip: true,
+        attr: DASHED_BOUNDARY_ATTR
+      })
+    })
+
+    it('solves boundaries that are linear in y for y before plotting', () => {
+      const { datum } = mapSingle('2y - x > 4')
+
+      expect(datum).toMatchObject({
+        fnType: 'linear',
+        graphType: 'polyline',
+        attr: DASHED_BOUNDARY_ATTR
+      })
+      expect(compact(datum.fn)).toBe('(x+4)/2')
+    })
+
+    it.each([
+      ['x + y <= 500', '500-x'],
+      ['y >= 10', '10']
+    ])('renders inclusive linear boundary %s as a solid explicit polyline', (expression, fn) => {
+      const { datum } = mapSingle(expression)
+
+      expect(datum).toMatchObject({
+        fnType: 'linear',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        skipTip: true,
+        attr: SOLID_BOUNDARY_ATTR
+      })
+      expect(compact(datum.fn)).toBe(fn)
+    })
+
+    it('renders a strict vertical boundary as a dashed two-point polyline', () => {
+      const { datum, inequality } = mapSingle('x < 3')
+
+      expect(datum).toEqual({
+        fnType: 'points',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        fn: '(x) - (3)',
+        verticalLineX: 3,
+        points: [[3, -10], [3, 10]],
+        color: '#c0f',
+        skipTip: true,
+        attr: DASHED_BOUNDARY_ATTR
+      })
+      expect(inequality.evaluate(2, 0)).toBe(true)
+      expect(inequality.evaluate(4, 0)).toBe(false)
+    })
+
+    it('renders an inclusive vertical boundary as a solid polyline', () => {
+      const { datum } = mapSingle('2x + 1 >= 5')
+
+      expect(datum).toMatchObject({
+        fnType: 'points',
+        graphType: 'polyline',
+        verticalLineX: 2,
+        attr: SOLID_BOUNDARY_ATTR
+      })
+    })
+
+    it('keeps parameters in scope for a strict parameterized boundary', () => {
+      const { datum, inequality } = mapSingle('y > m*x + b', { m: 2, b: 1 })
+
+      expect(datum).toEqual({
+        fnType: 'linear',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        fn: 'm*x + b',
+        scope: { m: 2, b: 1 },
+        color: '#c0f',
+        skipTip: true,
+        attr: DASHED_BOUNDARY_ATTR
+      })
+      expect(inequality.evaluate(0, 2)).toBe(true)
+      expect(inequality.evaluate(0, 0)).toBe(false)
+    })
+
+    it('places a parameterized vertical boundary from the current scope', () => {
+      const { datum } = mapSingle('x > k + 1', { k: 4 })
+
+      expect(datum.fnType).toBe('points')
+      expect(datum.verticalLineX).toBe(5)
+      expect(datum.attr).toEqual(DASHED_BOUNDARY_ATTR)
+    })
+
+    it('falls back to an implicit datum when a slider zeroes the y coefficient', () => {
+      expect(mapSingle('a*y > x', { a: 2 }).datum).toMatchObject({
+        fnType: 'linear',
+        graphType: 'polyline'
+      })
+
+      const { datum } = mapSingle('a*y > x', { a: 0 })
+      expect(datum).toMatchObject({
+        fnType: 'implicit',
+        fn: '(a*y) - (x)',
+        scope: { a: 0 },
+        attr: DASHED_BOUNDARY_ATTR
+      })
+    })
+
+    it('keeps genuinely implicit strict boundaries on the implicit datum', () => {
+      const { datum } = mapSingle('x^2 + y^2 < 9')
+
+      expect(datum).toEqual({
+        fnType: 'implicit',
+        fn: '(x^2 + y^2) - (9)',
+        scope: {},
+        color: '#c0f',
+        skipTip: true,
+        attr: DASHED_BOUNDARY_ATTR
+      })
+    })
+
+    it('redraws parameterized boundaries with updated scope on parameters:updated', () => {
+      mockState.functions = [
+        { id: 'line', expression: 'y > m*x + b', color: '#c0f', visible: true },
+        { id: 'wall', expression: 'x <= k', color: '#0cf', visible: true }
+      ]
+      mockState.parameters = {
+        m: { value: 2, min: -10, max: 10, step: 0.1 },
+        b: { value: 1, min: -10, max: 10, step: 0.1 },
+        k: { value: 3, min: -10, max: 10, step: 0.1 }
+      }
+
+      const engine = new GraphEngine('graph-canvas')
+      engine.init()
+      vi.runOnlyPendingTimers()
+
+      const renderer = rendererInstances[0]
+      let [line, wall] = renderer.dataCalls[renderer.dataCalls.length - 1].data
+      expect(line).toMatchObject({ fn: 'm*x + b', scope: { m: 2, b: 1 } })
+      expect(wall).toMatchObject({ verticalLineX: 3, attr: SOLID_BOUNDARY_ATTR })
+
+      mockState.parameters.m.value = -0.5
+      mockState.parameters.k.value = -4
+      EventBus.publish('parameters:updated', { name: 'm', value: -0.5 })
+      vi.runOnlyPendingTimers()
+
+      ;[line, wall] = renderer.dataCalls[renderer.dataCalls.length - 1].data
+      expect(line).toMatchObject({
+        fnType: 'linear',
+        graphType: 'polyline',
+        fn: 'm*x + b',
+        scope: { m: -0.5, b: 1 },
+        attr: DASHED_BOUNDARY_ATTR
+      })
+      expect(wall).toMatchObject({
+        fnType: 'points',
+        verticalLineX: -4,
+        points: [[-4, -10], [-4, 10]]
+      })
+    })
   })
 
   it('datumMeta tracks id for each plotted datum in order', () => {

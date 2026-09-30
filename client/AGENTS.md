@@ -79,6 +79,14 @@ styling is a last resort.
   using chart scales/margins after each draw. The renderer caches current
   inequality descriptors and repaints shading during zoom/pan interactions with
   requestAnimationFrame-coalesced redraws.
+  It also hooks two function-plot events for dashable boundary polylines:
+  `before:draw` re-fits datums with `verticalLineX` to the visible y-domain
+  (+5% overscan) on every draw, including zoom/pan frames; `eval` (fired after
+  sampling, before drawing) adjusts `graphType: 'polyline'` + `fnType: 'linear'`
+  sample groups in place: it splits them at domain gaps (NaN samples, e.g.
+  `sqrt(x^2 - 4)`) so no false segment bridges the gap, and clamps y to the
+  visible domain ± one height so steep curves (`y > e^x`) stay short enough for
+  browsers to dash. All listeners are removed in `destroy()`.
 - GraphEngine enforces equal unit scale on X/Y during render by deriving an
   aspect-locked viewport from the canonical state viewport and current canvas
   size. Policy is fixed to expanding the smaller axis around center (never
@@ -91,6 +99,14 @@ styling is a last resort.
   Generated function-plot datums also attach SVG `attr` defaults for visibility:
   scatter points use `r: 6` and stroke width `2`; explicit, implicit, vector,
   and inequality boundary strokes use stroke width `2.5`.
+  Inequality boundaries come from `buildInequalityBoundaryDatum()`: explicit
+  polyline (linear in y), two-point vertical polyline (`x <op> c`), or implicit
+  fallback. Their `attr` always sets `stroke-linecap: 'butt'` and
+  `stroke-dasharray` (`'6,4'` strict, `'none'` inclusive). function-plot reuses
+  `<path>` nodes keyed by `d.fn` and never clears attributes, so leaving the
+  dash unset would keep a stale dash after a `<` -> `<=` edit. Strict implicit
+  boundaries (e.g. circles) still render solid-looking because the interval
+  renderer draws one sub-path per pixel cell.
 
 ## Utilities
 - Line classification lives in `math/line-classifier.js` and is the single
@@ -106,6 +122,9 @@ styling is a last resort.
   writes honest metadata; suppression happens only in `handleFunctionsUpdate`.
 - `math/shared-parser.js` provides a shared ExpressionParser instance for
   caching across components.
+- `math/inequality-boundary.js` (`resolveInequalityBoundary(plotData, scope)`)
+  decides whether an inequality boundary can be drawn as `y = f(x)` or `x = c`
+  (dashable polylines) or must stay implicit.
 - `math/expression-adapter.js` is the single expression adaptation layer:
   `toFunctionPlotSyntax()` normalizes plot expressions for function-plot,
   `toDisplayLatex()` converts raw user input into polished LaTeX for display,

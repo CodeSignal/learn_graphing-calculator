@@ -61,6 +61,23 @@ alter math behavior.
      Results are LRU-cached (200 entries).
 7. `utils/math-formatter.js`: Converts expressions to LaTeX and back; renders
    with KaTeX. `toLatex()` delegates to `expression-adapter.js`.
+8. `inequality-boundary.js`: `resolveInequalityBoundary(plotData, scope)` for
+   inequality `plotData`. Returns:
+   - `{ type: 'explicit', fn }` when F = (lhs) - (rhs) is linear in y with a
+     y-coefficient free of x and y. `y <op> expr` / `expr <op> y` reuse `expr`
+     verbatim (through `toFunctionPlotSyntax`), otherwise
+     `fn = simplify(-F(x, 0) / (dF/dy))` printed with explicit `*`. `fn` may
+     reference parameters (callers pass `scope` to the datum).
+   - `{ type: 'vertical', x }` when F has no y (or y cancels) and is linear in
+     x (`x = -F(0) / (dF/dx)`, evaluated with `scope`).
+   - `null` otherwise: nonlinear in y (`x^2 + y^2 < 9`, `sin(y) > x`), a
+     y-coefficient that depends on x (`x*y > 1`, which could hide vertical
+     components of the zero set), nonlinear x-only (`x^2 < 4`), or a scope
+     that makes the coefficient 0 or non-finite (e.g. slider `a = 0` in
+     `a*y > x`).
+   Symbolic analysis (parse, `derivative`, `simplify`) is LRU-cached per
+   `boundaryExpression` (200 entries); per-render work is only numeric
+   evaluation of the cached compiled coefficients.
 
 ## Expectations & constraints
 - **Syntax vs. Semantics separation**: `parseAssignmentSyntax()` and
@@ -89,11 +106,18 @@ alter math behavior.
   - `tests/unit/math/expression-parser.test.js` covers ExpressionParser.
   - `tests/unit/math/line-classifier.test.js` covers line classification rules.
   - `tests/unit/math/parameter-utils.test.js` covers parameter inference rules.
+  - `tests/unit/math/inequality-boundary.test.js` covers boundary solving
+    (explicit, vertical, implicit fallback, scope-dependent degeneracy).
 - Run with `npm run test` or `npm run test:run`.
 - When modifying math behavior, update/add tests to maintain coverage.
 
 ## Known limitations
 - **Single-comparator inequalities only**: Chained comparisons are rejected.
+- **Dashed strict boundaries need an explicit form**: only boundaries that
+  `inequality-boundary.js` can rewrite as `y = f(x)` or `x = c` render dashed.
+  Genuinely implicit boundaries (circles, `y^2 < 4`, `x^2 < 4`, `x*y > 1`) keep
+  function-plot's interval renderer, whose per-pixel sub-paths restart the dash
+  pattern, so they look solid even when strict.
 - **Parametric expressions**: Not yet supported (`x(t)`, `y(t)`); architecture ready.
 
 ## Documentation rule

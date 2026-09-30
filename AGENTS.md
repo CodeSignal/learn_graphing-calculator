@@ -51,6 +51,12 @@ commands, or architecture.
      but cannot include `x` or `y`.
    - Parameter inference: `math/parameter-utils.js` (derives defined/used params
      from classified lines).
+   - Inequality boundaries: `math/inequality-boundary.js`
+     (`resolveInequalityBoundary(plotData, scope)`) solves a boundary for
+     `y = f(x)` (linear in y, y-coefficient free of x) or `x = c` (y-free,
+     linear in x) and returns `{ type: 'explicit', fn }`,
+     `{ type: 'vertical', x }`, or `null` (keep implicit). Symbolic analysis is
+     LRU-cached per boundary; only scope-dependent checks run per render.
    - Expression adaptation: `math/expression-adapter.js` (AST-based conversion
      layer that normalizes expressions for function-plot and produces polished
      display LaTeX from raw user input). Also provides `computeDerivative(expr)`
@@ -113,10 +119,21 @@ commands, or architecture.
        after evaluating coordinate expressions against current parameter scope.
        Explicit, implicit, and vector datums attach
        `attr: { 'stroke-width': 2.5 }` for readable strokes.
-     - For `graphMode: 'inequality'`, maps boundary curves to implicit datums
-       (`fnType: 'implicit'`) with `skipTip: true`; strict inequalities use a
-       dashed boundary stroke, inclusive inequalities use solid boundaries, and
-       both use `attr` stroke width `2.5`.
+     - For `graphMode: 'inequality'`, `buildInequalityBoundaryDatum()` maps the
+       boundary via `resolveInequalityBoundary()` (`math/inequality-boundary.js`)
+       to a continuous polyline so SVG dashes render: linear-in-y boundaries
+       (`y > m*x + b`, `x + y <= 500`) become explicit
+       `{ fnType: 'linear', graphType: 'polyline', sampler: 'builtIn', fn, scope }`
+       datums; y-free boundaries linear in x (`x < 3`) become two-point
+       `{ fnType: 'points', graphType: 'polyline', verticalLineX, points }`
+       datums (`fn` carries the boundary expression only as function-plot's
+       data-join key). Anything else (`x^2 + y^2 < 9`, or a slider zeroing the
+       y-coefficient) stays `fnType: 'implicit'`, which function-plot's interval
+       renderer draws as ~1px cells, so strict implicit boundaries still look
+       solid (known limitation). All boundaries use `skipTip: true` and
+       `attr: { 'stroke-width': 2.5, 'stroke-linecap': 'butt',
+       'stroke-dasharray': strict ? '6,4' : 'none' }`; dash and cap are always
+       explicit because function-plot reuses `<path>` nodes keyed by `d.fn`.
        Region shading is rendered by `FunctionPlotRenderer` on a custom canvas
        overlay using the compiled inequality predicates. The renderer caches
        the latest inequality descriptors and repaints shading during zoom/pan
@@ -225,6 +242,9 @@ commands, or architecture.
   `graph-engine.test.js` and `function-plot-renderer.test.js`) run with
   `npm run test` or `npm run test:run`. Use Vitest; tests live under `tests/`
   (and may also exist under `client/`).
+  `inequality-boundary-rendering.test.js` renders boundaries with the real
+  function-plot library in jsdom and asserts on the SVG paths (dash attributes,
+  single continuous path, vertical-line refit on zoom, domain-gap splitting).
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
   add/edit expressions, confirm plot redraws, switch between `f(x)` and `θ`
   tabs, verify sliders appear in `θ` for parameters (e.g., `a*sin(b*x)`),
