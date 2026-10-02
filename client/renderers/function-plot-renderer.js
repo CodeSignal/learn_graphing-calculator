@@ -1,7 +1,10 @@
 import functionPlot from 'function-plot';
+import { layoutTipLabel, parseTranslate } from './tip-label-placement.js';
 
 const INEQUALITY_SAMPLE_STEP = 3;
 const INEQUALITY_SHADE_ALPHA = 0.18;
+/** HTML elements floating over the plot (e.g. the zoom toolbar) that the readout avoids. */
+const PLOT_OVERLAY_SELECTOR = '[data-plot-overlay]';
 
 /**
  * Set or clear an axis title on a function-plot axis options object.
@@ -105,10 +108,74 @@ export default class FunctionPlotRenderer {
           this.callbacks.onZoom(viewport);
         }
         this.scheduleInequalityRender();
+      },
+      // Registered after function-plot's own `mousemove` listener (added in the
+      // Chart constructor), so it runs right after `tip.move()` has positioned
+      // the tip and written its text. Zoom/pan re-emit `mousemove`, and the
+      // listener survives `build()`, so rebuilds need no re-wiring.
+      tipMove: () => {
+        this.placeTipLabel();
       }
     };
 
     this.chart.on('zoom', this.boundHandlers.zoom);
+    this.chart.on('mousemove', this.boundHandlers.tipMove);
+  }
+
+  /**
+   * Keep the hover readout inside the plot area. function-plot always puts it
+   * right of and above the point, left-anchored, so near the right/top edges
+   * it is clipped; flip, slide, shrink or wrap it instead, clear of
+   * `[data-plot-overlay]` elements (see `tip-label-placement.js`).
+   */
+  placeTipLabel() {
+    const meta = this.chart?.meta;
+    if (!meta || !this.container) return;
+
+    const innerTip = this.container.querySelector('.function-plot g.tip g.inner-tip');
+    const text = innerTip?.querySelector('text');
+    if (!text || innerTip.style.display === 'none' || !text.textContent) return;
+
+    const point = parseTranslate(innerTip.getAttribute('transform'));
+    if (!point) return;
+
+    layoutTipLabel(text, {
+      pointX: point.x,
+      pointY: point.y,
+      plotWidth: meta.width,
+      plotHeight: meta.height,
+      obstacles: this.getPlotOverlayRects()
+    });
+  }
+
+  /**
+   * Rects of visible `[data-plot-overlay]` elements, in plot-area pixels.
+   * @returns {Array<{left: number, top: number, right: number, bottom: number}>}
+   */
+  getPlotOverlayRects() {
+    const plotArea = this.container?.querySelector('.function-plot .zoom-and-drag');
+    const plotWidth = this.chart?.meta?.width;
+    const plotHeight = this.chart?.meta?.height;
+    if (!plotArea || typeof document === 'undefined' || !(plotWidth > 0) || !(plotHeight > 0)) {
+      return [];
+    }
+
+    const plotRect = plotArea.getBoundingClientRect();
+    if (!(plotRect.width > 0) || !(plotRect.height > 0)) {
+      return [];
+    }
+    const scaleX = plotRect.width / plotWidth;
+    const scaleY = plotRect.height / plotHeight;
+
+    return Array.from(document.querySelectorAll(PLOT_OVERLAY_SELECTOR))
+      .map((element) => element.getBoundingClientRect())
+      .filter((rect) => rect.width > 0 && rect.height > 0)
+      .map((rect) => ({
+        left: (rect.left - plotRect.left) / scaleX,
+        top: (rect.top - plotRect.top) / scaleY,
+        right: (rect.right - plotRect.left) / scaleX,
+        bottom: (rect.bottom - plotRect.top) / scaleY
+      }));
   }
 
   updateData(data, inequalities = []) {
@@ -362,6 +429,7 @@ export default class FunctionPlotRenderer {
 
     if (this.chart && this.boundHandlers) {
       this.chart.removeListener('zoom', this.boundHandlers.zoom);
+      this.chart.removeListener('mousemove', this.boundHandlers.tipMove);
     }
 
     if (this.chart) {

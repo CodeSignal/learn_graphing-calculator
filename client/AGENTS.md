@@ -12,14 +12,18 @@ styling is a last resort.
    `template#help-content` is the in-app help reference: when you change
    supported syntax, tabs, sliders, or graph behavior, update that template so it
    stays aligned with `math/line-classifier.js` and the expression sidebar.
+   HTML that floats over the plot (`#graph-toolbar`, the floating sidebar
+   toggle) carries a `data-plot-overlay` attribute so the hover readout avoids
+   it; add the attribute to any new overlay control.
 2. `app.js`: Bootstraps StateManager, GraphEngine, sidebar components, help
    modal. It is the only place that should instantiate the app; do not spin up
    parallel apps.
 3. CSS:
    - `app.css`: base layout, utilities, and custom overrides. Uses design system
      tokens and variables. function-plot overrides: legend hidden (sidebar is
-     our legend; no native option), tip font size, dark-mode grid/origin
-     strokes, and axis-title styling (`.axis-label`: DS text token fill,
+     our legend; no native option), tip font size (the readout placement may
+     override it inline with `!important` only to fit a narrow plot),
+     dark-mode grid/origin strokes, and axis-title styling (`.axis-label`: DS text token fill,
      DS body font/size, `--canvas-bg` halo via `paint-order: stroke`).
 
 ## Design System usage
@@ -79,6 +83,20 @@ styling is a last resort.
   Both also accept `xAxisLabel` / `yAxisLabel` strings, mapped onto
   function-plot's native `xAxis.label` / `yAxis.label` (blank removes the
   label; on `rebuild()` an omitted value keeps the current label).
+  Keeps the hover readout inside the plot area: a chart `mousemove` listener
+  (registered after function-plot's, so it runs after `tip.move()`; removed in
+  `destroy()`) calls `placeTipLabel()`, which passes the tip `<text>`, the
+  tip point (from the `g.inner-tip` translate), `meta.width/height`, and
+  `[data-plot-overlay]` rects (`getPlotOverlayRects()`) to `layoutTipLabel()`.
+- `renderers/tip-label-placement.js`: Hover readout geometry. Pure
+  `computeTipLabelPlacement()` (right-above default, then left-above with
+  `text-anchor: end`, right-below, left-below, then slid along an edge; shrinks
+  text wider than the plot down to `TIP_LABEL_MIN_FONT_SIZE`; skips spots
+  overlapping obstacles when another in-plot spot exists), plus DOM helpers:
+  `measureTipLabel()` (getBBox → getComputedTextLength → char estimate),
+  `wrapTipLabel()` / `unwrapTipLabel()` (`id:` / `(x, y)` tspans),
+  `applyTipLabelPlacement()` and the orchestrator `layoutTipLabel()`. The
+  default placement leaves function-plot's `translate(5,-5)` untouched.
   Inequality region shading is rendered on a custom
   `.inequality-overlay-canvas` layer (absolute-positioned, pointer-events none)
   using chart scales/margins after each draw. The renderer caches current

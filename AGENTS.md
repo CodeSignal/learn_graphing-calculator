@@ -93,7 +93,8 @@ commands, or architecture.
        `inequalities`, an array of shading descriptors with compiled
        `evaluate(x, y)` predicates.
      - `tipRenderer(x, y, index)` formats the on-curve tooltip as
-       `id: (x, y)` using `datumMeta`.
+       `id: (x, y)` using `datumMeta`. Placement of that readout (kept inside
+       the plot area) is the renderer's job; see "Hover readout placement".
      - Reads `graph.annotations` from state and passes to renderer on every
        `init()` and `rebuild()`.
      - Reads `graph.xAxisLabel` / `graph.yAxisLabel`, normalizes them to
@@ -222,6 +223,25 @@ commands, or architecture.
   `--canvas-bg` halo via `paint-order: stroke`, so it follows both themes
   without a dark-mode media block. Runtime change:
   `StateManager.set('graph', { ...StateManager.get('graph'), xAxisLabel: '...' })`.
+- **Hover readout placement**: function-plot 1.24.4 (`dist/tip.js`) draws the
+  tip text left-anchored at a fixed `translate(5,-5)` from the hovered point
+  and never flips it; the tip group is clipped to the plot area, so the
+  readout used to be cut off near the right/top edges and in narrow
+  split-screen panels. `FunctionPlotRenderer` registers its own chart
+  `mousemove` listener after function-plot's (so it runs right after
+  `tip.move()`; zoom/pan re-emit `mousemove`; it survives `build()`), and
+  `placeTipLabel()` hands the tip `<text>` to `layoutTipLabel()` in
+  `renderers/tip-label-placement.js`. That module measures the text
+  (`getBBox()`, then `getComputedTextLength()`, else a char-count estimate)
+  and the pure `computeTipLabelPlacement()` picks, in order: right-above
+  (function-plot's default, left exactly as function-plot wrote it),
+  left-above (`text-anchor: end`), right-below, left-below, then slides along
+  the edge; a readout wider than the plot is shrunk (inline `font-size
+  !important`, min 12px) and, if still too wide, wrapped into `id:` /
+  `(x, y)` tspans. Candidates that overlap visible `[data-plot-overlay]`
+  elements (the zoom toolbar, the floating sidebar toggle) are skipped when
+  another in-plot spot exists. Text, fill color and crosshairs are untouched.
+  `node_modules` is not patched.
 - **Classification metadata**: `state.functions` entries may include derived
   classification fields (`kind`, `graphMode`, `error`, `paramName`, `value`,
   `usedVariables`, `plotExpression`, `plotData`) for UI consistency;
@@ -249,10 +269,16 @@ commands, or architecture.
   Use Vitest; tests live under `tests/` (and may also exist under `client/`).
   `components/function-plot-axis-labels.test.js` renders through the real
   (unmocked) function-plot in jsdom to assert the SVG axis-label text.
+  `components/tip-label-placement.test.js` covers the pure placement and the
+  measure/wrap helpers; `components/function-plot-tip-placement.test.js`
+  hovers the real function-plot in jsdom (DOM `mousemove` on `.zoom-and-drag`)
+  to assert the readout flips/slides/wraps inside the plot across zoom and
+  rebuilds.
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
   add/edit expressions, confirm plot redraws, switch between `f(x)` and `θ`
   tabs, verify sliders appear in `θ` for parameters (e.g., `a*sin(b*x)`),
-  zoom/pan, help modal opens.
+  zoom/pan, help modal opens. Hover a curve near the right and top edges (also
+  in a narrow window) and check the `id: (x, y)` readout stays fully visible.
 - **Prod sanity**: `npm run build && npm run start:prod`, hit
   `http://localhost:3000`, ensure assets load from `dist/`.
 - When introducing risky math/engine changes, add/update automated tests to

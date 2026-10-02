@@ -167,6 +167,26 @@ describe('FunctionPlotRenderer', () => {
     expect(initOptions.tip.yLine).toBe(true)
   })
 
+  it('re-places the tip readout on mousemove without changing tip options', () => {
+    const renderer = new FunctionPlotRenderer(container)
+    renderer.init({
+      width: 640,
+      height: 360,
+      viewport: { xMin: -5, xMax: 5, yMin: -3, yMax: 3 },
+      showGrid: true,
+      onZoom: vi.fn()
+    })
+
+    const chart = renderer.chart
+    expect(chart.on).toHaveBeenCalledWith('mousemove', expect.any(Function))
+    expect(functionPlotMock.mock.calls[0][0].tip).toEqual({ xLine: true, yLine: true })
+
+    // Mock chart renders no SVG: the listener must be a safe no-op
+    const placeSpy = vi.spyOn(renderer, 'placeTipLabel')
+    expect(() => chart.emitForTest('mousemove', { x: 1, y: 1 })).not.toThrow()
+    expect(placeSpy).toHaveBeenCalledTimes(1)
+  })
+
   it('omits tip.renderer when tipRenderer is not a function', () => {
     const renderer = new FunctionPlotRenderer(container)
 
@@ -539,7 +559,9 @@ describe('FunctionPlotRenderer', () => {
 
     renderer.destroy()
 
-    expect(chart.removeListener).toHaveBeenCalledTimes(1)
+    expect(chart.removeListener).toHaveBeenCalledTimes(2)
+    expect(chart.removeListener).toHaveBeenCalledWith('zoom', expect.any(Function))
+    expect(chart.removeListener).toHaveBeenCalledWith('mousemove', expect.any(Function))
     expect(chart.removeAllListeners).toHaveBeenCalledTimes(1)
     expect(chartCache[chartId]).toBeUndefined()
     expect(container.innerHTML).toBe('')
