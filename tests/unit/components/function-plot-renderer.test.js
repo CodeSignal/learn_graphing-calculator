@@ -52,10 +52,10 @@ function createMockChart(options) {
     removeAllListeners: vi.fn(),
     draw: vi.fn(),
     build: vi.fn(() => chart),
-    emitForTest: (eventName, payload) => {
+    emitForTest: (eventName, ...args) => {
       const handler = listeners.get(eventName)
       if (handler) {
-        handler(payload)
+        handler(...args)
       }
     },
     setDomainsForTest: (x, y) => {
@@ -437,6 +437,226 @@ describe('FunctionPlotRenderer', () => {
     expect(chart.options.grid).toBe(false)
   })
 
+  describe('boundary polylines', () => {
+    const initRenderer = () => {
+      const renderer = new FunctionPlotRenderer(container)
+      renderer.init({
+        width: 500,
+        height: 400,
+        viewport: { xMin: -10, xMax: 10, yMin: -10, yMax: 10 },
+        showGrid: true,
+        onZoom: vi.fn()
+      })
+      return renderer
+    }
+
+    it('re-fits vertical-line datums to the visible y-domain before each draw', () => {
+      const renderer = initRenderer()
+      const vertical = {
+        fnType: 'points',
+        graphType: 'polyline',
+        verticalLineX: 2,
+        points: [[2, 0], [2, 1]]
+      }
+      const other = { fnType: 'points', graphType: 'polyline', points: [[0, 0], [1, 1]] }
+      renderer.updateData([vertical, other])
+
+      const chart = renderer.chart
+      chart.emitForTest('before:draw')
+      expect(vertical.points).toEqual([[2, -11], [2, 11]])
+
+      chart.setDomainsForTest([-4, 4], [-2, 6])
+      chart.emitForTest('before:draw')
+      expect(vertical.points[0][0]).toBe(2)
+      expect(vertical.points[0][1]).toBeCloseTo(-2.4)
+      expect(vertical.points[1][1]).toBeCloseTo(6.4)
+      expect(other.points).toEqual([[0, 0], [1, 1]])
+    })
+
+    it('splits explicit polyline samples at domain gaps and clamps far-off values', () => {
+      const renderer = initRenderer()
+      renderer.updateData([
+        { fnType: 'linear', graphType: 'polyline', fn: 'sqrt(x^2 - 4)' }
+      ])
+
+      const groups = [[
+        [-4, 3.46], [-3, 2.24], [-2, 0],
+        [2, 0], [3, 2.24], [4, 1e9]
+      ]]
+      renderer.chart.emitForTest('eval', groups, 0, false)
+
+      expect(groups).toEqual([
+        [[-4, 3.46], [-3, 2.24], [-2, 0]],
+        [[2, 0], [3, 2.24], [4, 30]]
+      ])
+    })
+
+    it('does not split evenly spaced samples or touch non-polyline and helper samples', () => {
+      const renderer = initRenderer()
+      renderer.updateData([
+        { fnType: 'linear', graphType: 'polyline', fn: 'x' },
+        { fnType: 'linear', fn: 'x^9' }
+      ])
+
+      const even = [[[-1, -1], [0, 0], [1, 1], [2, 2]]]
+      renderer.chart.emitForTest('eval', even, 0, false)
+      expect(even).toEqual([[[-1, -1], [0, 0], [1, 1], [2, 2]]])
+
+      const interval = [[[-1, 1e9], [5, 1e9]]]
+      renderer.chart.emitForTest('eval', interval, 1, false)
+      expect(interval).toEqual([[[-1, 1e9], [5, 1e9]]])
+
+      const helper = [[[-1, 1e9], [5, 1e9]]]
+      renderer.chart.emitForTest('eval', helper, 0, true)
+      expect(helper).toEqual([[[-1, 1e9], [5, 1e9]]])
+    })
+  })
+
+  describe('grid-based shading and boundary tracing', () => {
+    // F = x - c on any grid (row-major ys x xs), like GraphEngine's compiled field
+    const halfPlane = (c = 0, extra = {}) => ({
+      id: 'h',
+      key: `x-${c}`,
+      color: '#f00',
+      operator: '>',
+      strict: true,
+      satisfiesPositive: true,
+      evaluate: () => { throw new Error('per-cell path must not be used') },
+      evaluateGrid: vi.fn((xs, ys) => {
+        const values = new Float64Array(xs.length * ys.length)
+        ys.forEach((_, j) => xs.forEach((x, i) => { values[(j * xs.length) + i] = x - c }))
+        return values
+      }),
+      evaluateAt: (x) => x - c,
+      satisfies: (value) => value > 0,
+      ...extra
+    })
+    const circle = () => ({
+      id: 'c',
+      key: 'circle',
+      color: '#00f',
+      operator: '<',
+      strict: true,
+      satisfiesPositive: false,
+      evaluate: () => false,
+      evaluateGrid: vi.fn((xs, ys) => {
+        const values = new Float64Array(xs.length * ys.length)
+        ys.forEach((y, j) => xs.forEach((x, i) => {
+          values[(j * xs.length) + i] = (x * x) + (y * y) - 9
+        }))
+        return values
+      }),
+      evaluateAt: (x, y) => (x * x) + (y * y) - 9,
+      satisfies: (value) => value < 0
+    })
+    const initRenderer = () => {
+      const renderer = new FunctionPlotRenderer(container)
+      renderer.init({
+        width: 500,
+        height: 400,
+        viewport: { xMin: -10, xMax: 10, yMin: -10, yMax: 10 },
+        showGrid: true,
+        onZoom: vi.fn()
+      })
+      return renderer
+    }
+
+    it('paints one rect per horizontal run of satisfied cells', () => {
+      const renderer = initRenderer()
+      const { width, height, margin } = renderer.chart.meta
+      const cols = Math.ceil(width / 3)
+      const rows = Math.ceil(height / 3)
+      canvasContext.fillRect.mockClear()
+
+      renderer.updateData([], [halfPlane(0)])
+
+      expect(canvasContext.fillRect).toHaveBeenCalledTimes(rows)
+      canvasContext.fillRect.mock.calls.forEach(([x, y, w, h], row) => {
+        expect(y).toBe(margin.top + (row * 3))
+        expect(h).toBe(3)
+        expect(x + w).toBe(margin.left + (cols * 3))
+        // the run starts at the first cell whose centre is right of x = 0
+        expect(renderer.chart.meta.xScale.invert(x - margin.left + 1.5)).toBeGreaterThan(0)
+        expect(renderer.chart.meta.xScale.invert(x - margin.left - 1.5)).toBeLessThan(0)
+      })
+    })
+
+    it('skips repainting when neither the viewport nor the inequalities changed', () => {
+      const renderer = initRenderer()
+      const inequality = halfPlane(0)
+      renderer.updateData([], [inequality])
+      canvasContext.clearRect.mockClear()
+      canvasContext.fillRect.mockClear()
+
+      // e.g. typing in another expression row: same inequality key, same viewport
+      renderer.updateData([], [halfPlane(0)])
+      expect(canvasContext.clearRect).not.toHaveBeenCalled()
+      expect(canvasContext.fillRect).not.toHaveBeenCalled()
+      expect(inequality.evaluateGrid).toHaveBeenCalledTimes(1)
+
+      renderer.updateData([], [halfPlane(0, { color: '#0f0' })])
+      expect(canvasContext.clearRect).toHaveBeenCalledTimes(1)
+      expect(canvasContext.fillRect).toHaveBeenCalled()
+
+      canvasContext.clearRect.mockClear()
+      renderer.updateData([], [halfPlane(2, { color: '#0f0' })])
+      expect(canvasContext.clearRect).toHaveBeenCalledTimes(1)
+
+      canvasContext.clearRect.mockClear()
+      renderer.chart.setDomainsForTest([-4, 4], [-3, 3])
+      renderer.renderInequalities(renderer.currentInequalities)
+      expect(canvasContext.clearRect).toHaveBeenCalledTimes(1)
+    })
+
+    it('replaces contour datum samples with the traced boundary on eval', () => {
+      const renderer = initRenderer()
+      const datum = {
+        fnType: 'points',
+        graphType: 'polyline',
+        fn: 'circle',
+        points: [],
+        contourOf: 'c'
+      }
+      renderer.updateData([datum], [circle()])
+
+      const groups = [datum.points]
+      renderer.chart.emitForTest('eval', groups, 0, false)
+
+      expect(groups).toHaveLength(1)
+      const [path] = groups
+      expect(path.length).toBeGreaterThan(50)
+      expect(path[0]).toEqual(path[path.length - 1])
+      path.forEach(([x, y]) => expect(Math.abs(Math.hypot(x, y) - 3)).toBeLessThan(0.05))
+
+      // unknown inequality id: nothing to draw
+      renderer.updateData([{ ...datum, contourOf: 'missing' }], [circle()])
+      const orphan = [[[0, 0]]]
+      renderer.chart.emitForTest('eval', orphan, 0, false)
+      expect(orphan).toEqual([])
+    })
+
+    it('evaluates each inequality grid once per viewport for tracing and shading', () => {
+      const renderer = initRenderer()
+      const inequality = circle()
+      const datum = {
+        fnType: 'points',
+        graphType: 'polyline',
+        fn: 'c',
+        points: [],
+        contourOf: 'c'
+      }
+      renderer.updateData([datum], [inequality])
+      renderer.chart.emitForTest('eval', [[]], 0, false)
+      renderer.renderInequalities(renderer.currentInequalities)
+      expect(inequality.evaluateGrid).toHaveBeenCalledTimes(1)
+
+      renderer.chart.setDomainsForTest([-5, 5], [-5, 5])
+      renderer.chart.emitForTest('eval', [[]], 0, false)
+      renderer.renderInequalities(renderer.currentInequalities)
+      expect(inequality.evaluateGrid).toHaveBeenCalledTimes(2)
+    })
+  })
+
   it('destroys listeners and clears cache/container state', () => {
     const renderer = new FunctionPlotRenderer(container)
 
@@ -455,7 +675,8 @@ describe('FunctionPlotRenderer', () => {
 
     renderer.destroy()
 
-    expect(chart.removeListener).toHaveBeenCalledTimes(1)
+    const removedEvents = chart.removeListener.mock.calls.map(([eventName]) => eventName)
+    expect(removedEvents.sort()).toEqual(['before:draw', 'eval', 'zoom'])
     expect(chart.removeAllListeners).toHaveBeenCalledTimes(1)
     expect(chartCache[chartId]).toBeUndefined()
     expect(container.innerHTML).toBe('')

@@ -10,6 +10,8 @@ import { classifyLine } from './math/line-classifier.js';
 import { analyzeParameters } from './math/parameter-utils.js';
 import { DEFAULT_PARAMETER } from './math/parameter-defaults.js';
 import { toFunctionPlotSyntax, computeDerivative } from './math/expression-adapter.js';
+import { resolveInequalityBoundary } from './math/inequality-boundary.js';
+import { compileInequalityField } from './math/inequality-field.js';
 import { getColorForIndex } from './utils/color-constants.js';
 import { generateParameterAssignmentId } from './utils/expression-ids.js';
 import { formatParameterValue } from './utils/parameter-number-format.js';
@@ -20,6 +22,7 @@ const VIEWPORT_EPSILON = 1e-9;
 const INEQUALITY_EPSILON = 1e-9;
 const POINT_ATTR = { r: 6, 'stroke-width': 2 };
 const STROKE_ATTR = { 'stroke-width': 2.5 };
+const STRICT_BOUNDARY_DASH = '6,4';
 
 export default class GraphEngine {
   constructor(containerId) {
@@ -435,39 +438,46 @@ export default class GraphEngine {
             break;
           }
 
-          const boundaryDatum = {
-            fnType: 'implicit',
-            fn: adaptedBoundary,
-            scope: { ...scope },
-            color: func.color,
-            skipTip: true,
-            attr: STROKE_ATTR
-          };
-          if (inequalityData.strict) {
-            boundaryDatum.attr = { ...STROKE_ATTR, 'stroke-dasharray': '6,4' };
-          }
-
-          data.push(boundaryDatum);
-          meta.push({ id: func.id });
-
           const evaluate = this.buildInequalityEvaluator(
             boundaryExpression,
             classification.usedVariables,
             scope,
             inequalityData
           );
+          const field = evaluate ? compileInequalityField(boundaryExpression, scope) : null;
+
+          data.push(this.buildInequalityBoundaryDatum(
+            inequalityData,
+            adaptedBoundary,
+            scope,
+            func.color,
+            field ? func.id : null
+          ));
+          meta.push({ id: func.id });
+
           if (!evaluate) {
             break;
           }
 
-          inequalities.push({
+          const descriptor = {
             id: func.id,
             color: func.color,
             operator: inequalityData.operator,
             strict: inequalityData.strict === true,
             satisfiesPositive: inequalityData.satisfiesPositive === true,
             evaluate
-          });
+          };
+          if (field) {
+            // Grid path used by FunctionPlotRenderer for shading and boundary tracing:
+            // F values for a whole sampling grid at once (and at single points, to tell
+            // roots from poles), the predicate applied to F, and a cache key (expression +
+            // the parameter values it uses).
+            descriptor.key = field.key;
+            descriptor.evaluateGrid = field.evaluateGrid;
+            descriptor.evaluateAt = field.evaluateAt;
+            descriptor.satisfies = this.buildInequalityPredicate(inequalityData);
+          }
+          inequalities.push(descriptor);
           break;
         }
         default:
@@ -476,6 +486,105 @@ export default class GraphEngine {
     });
 
     return { data, meta, inequalities };
+  }
+
+  /**
+   * Build the function-plot datum for an inequality boundary. Strict boundaries are dashed,
+   * inclusive ones solid.
+   *
+   * A dash only renders on a continuous path, so boundaries are drawn as polylines when
+   * possible:
+   * - linear in y (`y > m*x + b`, `x + y <= 500`): explicit curve y = f(x);
+   * - free of y and linear in x (`x < 3`): a two-point vertical line whose y-extent
+   *   FunctionPlotRenderer re-fits to the visible domain before every draw (`verticalLineX`).
+   * - anything else (e.g. `x^2 + y^2 < 9`, `x*y > 1`): when `contourId` is given, a polyline
+   *   datum (`contourOf: contourId`) whose paths FunctionPlotRenderer traces with marching
+   *   squares from the inequality's shading grid on every draw, one continuous path per curve
+   *   component. Without it (no grid evaluator) the boundary stays an implicit datum, which
+   *   function-plot draws with its interval renderer as one sub-path per ~1px cell; the dash
+   *   restarts on every sub-path, so such a strict boundary looks solid.
+   *
+   * The dash and cap are always set explicitly: function-plot reuses `<path>` nodes keyed by
+   * `d.fn` and only writes the attributes listed in `d.attr`, so a boundary edited from `<` to
+   * `<=` would otherwise keep its stale dasharray. Butt caps keep polyline round caps
+   * from filling the 4px gaps.
+   */
+  buildInequalityBoundaryDatum(inequalityData, adaptedBoundary, scope, color, contourId = null) {
+    const common = {
+      color,
+      skipTip: true,
+      attr: {
+        ...STROKE_ATTR,
+        'stroke-linecap': 'butt',
+        'stroke-dasharray': inequalityData.strict ? STRICT_BOUNDARY_DASH : 'none'
+      }
+    };
+    const boundary = resolveInequalityBoundary(inequalityData, scope);
+
+    if (boundary?.type === 'explicit') {
+      return {
+        fnType: 'linear',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        fn: boundary.fn,
+        scope: { ...scope },
+        ...common
+      };
+    }
+
+    if (boundary?.type === 'vertical') {
+      const { yMin, yMax } = this.getAspectLockedViewport(this.viewport);
+      return {
+        fnType: 'points',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        // Unused by the points sampler; function-plot keys each datum's <g> by `d.fn`.
+        fn: adaptedBoundary,
+        verticalLineX: boundary.x,
+        points: [[boundary.x, yMin], [boundary.x, yMax]],
+        ...common
+      };
+    }
+
+    if (contourId !== null && contourId !== undefined) {
+      return {
+        fnType: 'points',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        // Unused by the points sampler; function-plot keys each datum's <g> by `d.fn`.
+        fn: adaptedBoundary,
+        // Replaced by the traced boundary paths in FunctionPlotRenderer's `eval` hook.
+        points: [],
+        contourOf: contourId,
+        ...common
+      };
+    }
+
+    return {
+      fnType: 'implicit',
+      fn: adaptedBoundary,
+      scope: { ...scope },
+      ...common
+    };
+  }
+
+  /**
+   * Predicate on the boundary value F = (lhs) - (rhs): true where the inequality holds.
+   * Non-finite values (outside the expression's domain) never satisfy it.
+   */
+  buildInequalityPredicate(inequalityData) {
+    const strict = inequalityData.strict === true;
+    const satisfiesPositive = inequalityData.satisfiesPositive === true;
+
+    if (strict) {
+      return satisfiesPositive
+        ? (value) => Number.isFinite(value) && value > INEQUALITY_EPSILON
+        : (value) => Number.isFinite(value) && value < -INEQUALITY_EPSILON;
+    }
+
+    return satisfiesPositive
+      ? (value) => Number.isFinite(value) && value >= -INEQUALITY_EPSILON
+      : (value) => Number.isFinite(value) && value <= INEQUALITY_EPSILON;
   }
 
   buildInequalityEvaluator(boundaryExpression, usedVariables, scopeValues, inequalityData) {
@@ -491,8 +600,7 @@ export default class GraphEngine {
       return null;
     }
 
-    const strict = inequalityData.strict === true;
-    const satisfiesPositive = inequalityData.satisfiesPositive === true;
+    const satisfies = this.buildInequalityPredicate(inequalityData);
     const evalScope = { ...(scopeValues || {}), x: 0, y: 0 };
 
     return (x, y) => {
@@ -505,19 +613,7 @@ export default class GraphEngine {
         return false;
       }
 
-      if (!Number.isFinite(value)) {
-        return false;
-      }
-
-      if (strict) {
-        return satisfiesPositive
-          ? value > INEQUALITY_EPSILON
-          : value < -INEQUALITY_EPSILON;
-      }
-
-      return satisfiesPositive
-        ? value >= -INEQUALITY_EPSILON
-        : value <= INEQUALITY_EPSILON;
+      return satisfies(value);
     };
   }
 
