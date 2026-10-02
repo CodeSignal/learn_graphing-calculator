@@ -588,6 +588,113 @@ describe('GraphEngine (function-plot migration)', () => {
     expect(lastRebuild.annotations).toEqual([{ y: 1, text: 'y=1' }])
   })
 
+  it('passes axis labels from graph state to renderer init', () => {
+    mockState.graph = {
+      xMin: 60, xMax: 80, yMin: 110, yMax: 210,
+      showGrid: true,
+      xAxisLabel: 'Third-exam score',
+      yAxisLabel: 'Final-exam score'
+    }
+
+    const engine = new GraphEngine('graph-canvas')
+    engine.init()
+    vi.runOnlyPendingTimers()
+
+    const renderer = rendererInstances[0]
+    expect(renderer.lastInitArgs.xAxisLabel).toBe('Third-exam score')
+    expect(renderer.lastInitArgs.yAxisLabel).toBe('Final-exam score')
+  })
+
+  it('passes empty axis labels when graph state has none', () => {
+    const engine = new GraphEngine('graph-canvas')
+    engine.init()
+    vi.runOnlyPendingTimers()
+
+    const renderer = rendererInstances[0]
+    expect(renderer.lastInitArgs.xAxisLabel).toBe('')
+    expect(renderer.lastInitArgs.yAxisLabel).toBe('')
+  })
+
+  it('rebuilds with new axis labels when only the labels change', () => {
+    const engine = new GraphEngine('graph-canvas')
+    engine.init()
+    vi.runOnlyPendingTimers()
+
+    const renderer = rendererInstances[0]
+    renderer.rebuildCalls = []
+
+    const nextGraph = { ...mockState.graph, xAxisLabel: 'Hours', yAxisLabel: 'Score' }
+    StateManager.set('graph', nextGraph)
+    EventBus.publish('state:changed', { path: 'graph', value: nextGraph })
+    vi.runOnlyPendingTimers()
+
+    expect(renderer.rebuildCalls).toHaveLength(1)
+    expect(renderer.rebuildCalls[0]).toMatchObject({ xAxisLabel: 'Hours', yAxisLabel: 'Score' })
+
+    // Same labels again: no extra rebuild
+    EventBus.publish('state:changed', { path: 'graph', value: { ...nextGraph } })
+    vi.runOnlyPendingTimers()
+    expect(renderer.rebuildCalls).toHaveLength(1)
+
+    // Removing a label rebuilds with an empty string so the renderer clears it
+    const clearedGraph = { ...nextGraph }
+    delete clearedGraph.yAxisLabel
+    StateManager.set('graph', clearedGraph)
+    EventBus.publish('state:changed', { path: 'graph', value: clearedGraph })
+    vi.runOnlyPendingTimers()
+
+    expect(renderer.rebuildCalls).toHaveLength(2)
+    expect(renderer.rebuildCalls[1]).toMatchObject({ xAxisLabel: 'Hours', yAxisLabel: '' })
+  })
+
+  it('keeps axis labels across zoom, resize, reset, and data-only updates', () => {
+    const initialGraph = {
+      xMin: 60, xMax: 80, yMin: 110, yMax: 210,
+      showGrid: true,
+      xAxisLabel: 'Third-exam score',
+      yAxisLabel: 'Final-exam score'
+    }
+    mockState.graph = { ...initialGraph }
+    mockState.functions = [
+      { id: 'scores', expression: 'points([[62,130],[75,180]])', color: '#08f', visible: true }
+    ]
+
+    const engine = new GraphEngine('graph-canvas')
+    engine.init()
+    vi.runOnlyPendingTimers()
+
+    const renderer = rendererInstances[0]
+    const labels = { xAxisLabel: 'Third-exam score', yAxisLabel: 'Final-exam score' }
+    renderer.rebuildCalls = []
+
+    // Zoom button
+    engine.zoom(1.2)
+    vi.advanceTimersByTime(600) // render + debounced viewport save
+    expect(renderer.rebuildCalls.at(-1)).toMatchObject(labels)
+    expect(mockState.graph).toMatchObject(labels)
+
+    // Resize
+    const parent = document.getElementById('plot-parent')
+    Object.defineProperty(parent, 'clientWidth', { value: 600, configurable: true })
+    engine.onResize()
+    vi.runOnlyPendingTimers()
+    expect(renderer.rebuildCalls.at(-1)).toMatchObject({ width: 600, ...labels })
+
+    // Reset view (app.js sets graph back to the initial config graph)
+    StateManager.set('graph', { ...initialGraph })
+    EventBus.publish('state:changed', { path: 'graph', value: { ...initialGraph } })
+    vi.runOnlyPendingTimers()
+    expect(renderer.rebuildCalls.at(-1)).toMatchObject(labels)
+
+    // Parameter/expression updates redraw data without rebuilding the axes
+    const rebuildCount = renderer.rebuildCalls.length
+    const dataCallCount = renderer.dataCalls.length
+    EventBus.publish('parameters:updated', {})
+    vi.runOnlyPendingTimers()
+    expect(renderer.rebuildCalls).toHaveLength(rebuildCount)
+    expect(renderer.dataCalls.length).toBeGreaterThan(dataCallCount)
+  })
+
   it('attaches auto-computed derivative to explicit datum when func.derivative is set', () => {
     const engine = new GraphEngine('graph-canvas')
 

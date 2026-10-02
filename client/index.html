@@ -101,14 +101,17 @@
     <button
       id="btn-floating-toggle-sidebar"
       class="button button-secondary sidebar-floating-toggle"
+      data-plot-overlay
       aria-label="Show sidebar">
       &gt;&gt;
     </button>
 
     <div class="content-area" style="padding: 0; position: relative;">
       <!-- Toolbar for Graph -->
+      <!-- data-plot-overlay: the hover readout is kept clear of this element -->
       <div
         id="graph-toolbar"
+        data-plot-overlay
         style="position: absolute; top: 1rem; right: 1rem;
           z-index: 10; display: flex; gap: 0.5rem;">
         <button class="button button-secondary" id="btn-home" aria-label="Reset View">⟲</button>
@@ -269,8 +272,11 @@
         </li>
         <li>
           <strong>Tooltip</strong> — on a plottable curve, hover shows
-          <code>id: (x, y)</code> with coordinates to three decimals. Inequality
-          boundaries do not show curve tips.
+          <code>id: (x, y)</code> with coordinates to three decimals. Near the
+          right or top edge of the plot it moves to the left of or below the
+          point so it stays fully visible; in a very narrow plot it is shrunk
+          slightly or split onto two lines. Inequality boundaries do not show
+          curve tips.
         </li>
         <li>
           Grid on/off comes from the loaded config (<code>graph.showGrid</code>),

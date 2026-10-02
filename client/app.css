@@ -69,6 +69,9 @@ html, body {
 /* ===== APPLICATION VARIABLES ===== */
 :root {
   --canvas-bg: #ffffff;
+  /* Axis titles: DS text token flips with the theme; halo matches the canvas */
+  --graph-axis-label-fill: var(--Colors-Text-Body-Strong);
+  --graph-axis-label-halo: var(--canvas-bg);
 }
 
 /* ===== LAYOUT OVERRIDES ===== */
@@ -130,6 +133,26 @@ html, body {
     opacity: var(--graph-origin-opacity) !important;
     stroke: var(--graph-origin-stroke) !important;
   }
+}
+
+/*
+ * Axis titles (graph.xAxisLabel / graph.yAxisLabel), drawn natively by function-plot
+ * inside the plot area: x at the bottom-right above the x-axis tick numbers, y rotated
+ * at the top-left beside the y-axis tick numbers. Unstyled they are black and inherit
+ * the canvas-scaled SVG font size, so use DS text tokens plus a canvas-colored halo
+ * that keeps them legible over grid lines in both themes.
+ */
+#graph-canvas .function-plot .axis-label {
+  fill: var(--graph-axis-label-fill);
+  font-family: var(--label-family), sans-serif;
+  font-size: var(--Fonts-Body-Default-sm);
+  font-weight: 500;
+  paint-order: stroke fill;
+  stroke: var(--graph-axis-label-halo);
+  stroke-width: 4px;
+  stroke-linejoin: round;
+  pointer-events: none;
+  user-select: none;
 }
 
 /* Hide function-plot legend; sidebar expression list is our legend (no native option) */

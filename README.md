@@ -141,7 +141,35 @@ Required bounds:
 Optional fields:
 
 - `showGrid`: `true` or `false`
+- `xAxisLabel`: title for the horizontal axis (string)
+- `yAxisLabel`: title for the vertical axis (string)
 - `annotations`: reference lines shown on the graph
+
+Axis titles are omitted by default. When set, they must be strings; an empty
+string means no title. The x-axis title is drawn at the bottom-right of the
+plot, just above the tick numbers, and the y-axis title is rotated and drawn at
+the top-left, beside the tick numbers. Both stay in place through zoom, pan,
+reset view, and resizing.
+
+```json
+{
+  "functions": [
+    {
+      "id": "scores",
+      "expression": "points([[62,128],[68,149],[72,166],[78,189]])"
+    }
+  ],
+  "graph": {
+    "xMin": 60,
+    "xMax": 80,
+    "yMin": 110,
+    "yMax": 210,
+    "showGrid": true,
+    "xAxisLabel": "Third-exam score",
+    "yAxisLabel": "Final-exam score"
+  }
+}
+```
 
 Annotation entries use this shape:
 

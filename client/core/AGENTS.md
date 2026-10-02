@@ -19,7 +19,8 @@ minimal and documented.
    This avoids circular dependencies while maintaining explicit coupling.
 3. `config-loader.js`: Validates and normalizes config objects or fetched JSON;
    applies defaults, auto-assigns ids/colors. Schema:
-   `{functions: [], graph: {xMin, xMax, yMin, yMax, showGrid}}`.
+   `{functions: [], graph: {xMin, xMax, yMin, yMax, showGrid, xAxisLabel?,
+   yAxisLabel?, annotations?}}`.
 
 ## Usage patterns
 - `state:changed:functions` is the canonical signal for any function/expression
@@ -51,6 +52,13 @@ minimal and documented.
 - `graph.annotations` array is now a first-class schema field: validated
   (each entry must have `x` or `y`; both numeric; `text` optional string),
   defaults to `[]`.
+- `graph.xAxisLabel` / `graph.yAxisLabel`: optional axis titles, validated
+  in `validate()` alongside the boolean/numeric graph fields (must be a string
+  when present, else `Config.graph.<field> must be a string`; `null` is
+  rejected). `_applyDefaults()` passes them through unchanged and injects no
+  default, so configs without them normalize exactly as before. Empty string
+  means no label (handled by GraphEngine/renderer).
+- Tests: `tests/unit/core/config-loader.test.js`.
 - Function entries support optional `derivative` (object) and `secants` (array)
   fields; `_applyDefaults` normalizes them (strips non-object derivatives,
   strips secant entries missing numeric `x0`).

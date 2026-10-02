@@ -7,7 +7,10 @@
  * Config structure:
  * {
  *   functions: [{id: string, expression: string, editable?: boolean, visible?: boolean}],
- *   graph: {xMin: number, xMax: number, yMin: number, yMax: number, showGrid: boolean}
+ *   graph: {
+ *     xMin: number, xMax: number, yMin: number, yMax: number, showGrid: boolean,
+ *     xAxisLabel?: string, yAxisLabel?: string, annotations?: Array
+ *   }
  * }
  *
  * Usage:
@@ -137,6 +140,14 @@ class ConfigLoaderClass {
       for (const field of booleanGraphFields) {
         if (config.graph[field] !== undefined && typeof config.graph[field] !== 'boolean') {
           throw new Error(`Config.graph.${field} must be a boolean`);
+        }
+      }
+
+      // Optional axis titles; an empty string means "no label"
+      const stringGraphFields = ['xAxisLabel', 'yAxisLabel'];
+      for (const field of stringGraphFields) {
+        if (config.graph[field] !== undefined && typeof config.graph[field] !== 'string') {
+          throw new Error(`Config.graph.${field} must be a string`);
         }
       }
 

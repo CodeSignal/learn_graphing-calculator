@@ -93,9 +93,14 @@ commands, or architecture.
        `inequalities`, an array of shading descriptors with compiled
        `evaluate(x, y)` predicates.
      - `tipRenderer(x, y, index)` formats the on-curve tooltip as
-       `id: (x, y)` using `datumMeta`.
+       `id: (x, y)` using `datumMeta`. Placement of that readout (kept inside
+       the plot area) is the renderer's job; see "Hover readout placement".
      - Reads `graph.annotations` from state and passes to renderer on every
        `init()` and `rebuild()`.
+     - Reads `graph.xAxisLabel` / `graph.yAxisLabel`, normalizes them to
+       trimmed strings (`''` = no label) via `getAxisLabels()`, and passes
+       them to renderer `init()`/`rebuild()`. Label changes count as display
+       changes in `syncDisplayConfigFromGraph()` and trigger a rebuild.
      - For explicit expressions with `func.derivative`, auto-computes the
        symbolic derivative via `computeDerivative()` (or uses the caller-
        supplied `fn` string) and attaches it to the datum. `updateOnMouseMove`
@@ -130,6 +135,10 @@ commands, or architecture.
      `{ x?: number, y?: number, text?: string }`. Vertical line if `x` set,
      horizontal if `y` set. Defaults to `[]`. Validated and normalized by
      `ConfigLoader`. Passed to function-plot on every render.
+   - `graph.xAxisLabel` / `graph.yAxisLabel` (optional strings): axis titles.
+     Absent by default (no default is injected); `ConfigLoader` rejects
+     non-strings; empty/blank strings mean no label. Rendered natively by
+     function-plot (`xAxis.label` / `yAxis.label`).
    - Function entries support optional `derivative` (object) and `secants`
      (array) fields for educational overlays; see Coding rules for semantics.
 7. **Logging**:
@@ -200,6 +209,39 @@ commands, or architecture.
   `rebuild`. They are config-driven; to update at runtime call
   `StateManager.set('graph', { ...StateManager.get('graph'), annotations: [...] })`
   which triggers a rebuild.
+- **Axis labels**: `state.graph.xAxisLabel` / `yAxisLabel` map to function-plot
+  `options.xAxis.label` / `options.yAxis.label` in `FunctionPlotRenderer`
+  (`applyAxisLabel()`; blank removes the key). function-plot 1.24.4 draws them
+  in `Chart.buildAxisLabel()` on every `build()` as `text.x.axis-label`
+  (bottom-right of the plot area, `y = height - 6`, above the x tick numbers)
+  and `text.y.axis-label` (`rotate(-90)`, top-left, right of the y tick
+  numbers). Zoom/pan and data updates call `draw()`, which leaves them alone;
+  resize/reset/zoom buttons call `build()`, which repositions them. On
+  `rebuild()`, an omitted label keeps the current one, a string replaces it.
+  Styling lives in `app.css` (`#graph-canvas .function-plot .axis-label`):
+  `--graph-axis-label-fill` (`--Colors-Text-Body-Strong`) plus a
+  `--canvas-bg` halo via `paint-order: stroke`, so it follows both themes
+  without a dark-mode media block. Runtime change:
+  `StateManager.set('graph', { ...StateManager.get('graph'), xAxisLabel: '...' })`.
+- **Hover readout placement**: function-plot 1.24.4 (`dist/tip.js`) draws the
+  tip text left-anchored at a fixed `translate(5,-5)` from the hovered point
+  and never flips it; the tip group is clipped to the plot area, so the
+  readout used to be cut off near the right/top edges and in narrow
+  split-screen panels. `FunctionPlotRenderer` registers its own chart
+  `mousemove` listener after function-plot's (so it runs right after
+  `tip.move()`; zoom/pan re-emit `mousemove`; it survives `build()`), and
+  `placeTipLabel()` hands the tip `<text>` to `layoutTipLabel()` in
+  `renderers/tip-label-placement.js`. That module measures the text
+  (`getBBox()`, then `getComputedTextLength()`, else a char-count estimate)
+  and the pure `computeTipLabelPlacement()` picks, in order: right-above
+  (function-plot's default, left exactly as function-plot wrote it),
+  left-above (`text-anchor: end`), right-below, left-below, then slides along
+  the edge; a readout wider than the plot is shrunk (inline `font-size
+  !important`, min 12px) and, if still too wide, wrapped into `id:` /
+  `(x, y)` tspans. Candidates that overlap visible `[data-plot-overlay]`
+  elements (the zoom toolbar, the floating sidebar toggle) are skipped when
+  another in-plot spot exists. Text, fill color and crosshairs are untouched.
+  `node_modules` is not patched.
 - **Classification metadata**: `state.functions` entries may include derived
   classification fields (`kind`, `graphMode`, `error`, `paramName`, `value`,
   `usedVariables`, `plotExpression`, `plotData`) for UI consistency;
@@ -222,13 +264,21 @@ commands, or architecture.
 
 ## Testing & QA
 - **Automated tests**: Unit tests for math/core/components (including
-  `graph-engine.test.js` and `function-plot-renderer.test.js`) run with
-  `npm run test` or `npm run test:run`. Use Vitest; tests live under `tests/`
-  (and may also exist under `client/`).
+  `graph-engine.test.js`, `function-plot-renderer.test.js`, and
+  `core/config-loader.test.js`) run with `npm run test` or `npm run test:run`.
+  Use Vitest; tests live under `tests/` (and may also exist under `client/`).
+  `components/function-plot-axis-labels.test.js` renders through the real
+  (unmocked) function-plot in jsdom to assert the SVG axis-label text.
+  `components/tip-label-placement.test.js` covers the pure placement and the
+  measure/wrap helpers; `components/function-plot-tip-placement.test.js`
+  hovers the real function-plot in jsdom (DOM `mousemove` on `.zoom-and-drag`)
+  to assert the readout flips/slides/wraps inside the plot across zoom and
+  rebuilds.
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
   add/edit expressions, confirm plot redraws, switch between `f(x)` and `θ`
   tabs, verify sliders appear in `θ` for parameters (e.g., `a*sin(b*x)`),
-  zoom/pan, help modal opens.
+  zoom/pan, help modal opens. Hover a curve near the right and top edges (also
+  in a narrow window) and check the `id: (x, y)` readout stays fully visible.
 - **Prod sanity**: `npm run build && npm run start:prod`, hit
   `http://localhost:3000`, ensure assets load from `dist/`.
 - When introducing risky math/engine changes, add/update automated tests to
