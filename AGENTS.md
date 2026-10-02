@@ -57,6 +57,22 @@ commands, or architecture.
      linear in x) and returns `{ type: 'explicit', fn }`,
      `{ type: 'vertical', x }`, or `null` (keep implicit). Symbolic analysis is
      LRU-cached per boundary; only scope-dependent checks run per render.
+   - Inequality grid evaluation: `math/inequality-field.js`
+     (`compileInequalityField(boundaryExpression, scope)`) evaluates
+     F = (lhs) - (rhs) on a whole sampling grid. It splits F at top-level `+`/`-`
+     into x-only, y-only, separable-product (`x*y`) and mixed terms, so x/y-only
+     work runs once per column/row and only mixed terms (`sin(x*y)`) run per
+     cell. Plain real arithmetic and `Math`-identical functions run as AST
+     closures (no code generation), falling back to math.js whenever that
+     yields a non-finite value; values match evaluating F with math.js
+     (non-number terms -> NaN).
+     Returns `{ key, evaluateGrid(xs, ys), evaluateAt(x, y) }` (or `null` when
+     unparseable); `key` = expression + the parameter values it uses.
+   - Boundary tracing: `math/marching-squares.js` (`traceContours(values, cols,
+     rows, xs, ys, { evaluate })`) traces F = 0 on a grid into joined polylines
+     (closed loops repeat their first point; curves stop at non-finite samples;
+     saddles resolved by the cell mean). With `evaluate`, sign changes through
+     a pole (`x/y` at y = 0) are dropped.
    - Expression adaptation: `math/expression-adapter.js` (AST-based conversion
      layer that normalizes expressions for function-plot and produces polished
      display LaTeX from raw user input). Also provides `computeDerivative(expr)`
@@ -97,7 +113,10 @@ commands, or architecture.
        parallel array of `{ id }` entries for each plotted datum (used by
        `tipRenderer` to show expression ids in tooltips). It now also returns
        `inequalities`, an array of shading descriptors with compiled
-       `evaluate(x, y)` predicates.
+       `evaluate(x, y)` predicates plus, when the boundary compiles, the grid
+       path `key`, `evaluateGrid(xs, ys)`, `evaluateAt(x, y)` (from
+       `compileInequalityField`) and `satisfies(F)` (from
+       `buildInequalityPredicate`, shared with `evaluate`).
      - `tipRenderer(x, y, index)` formats the on-curve tooltip as
        `id: (x, y)` using `datumMeta`.
      - Reads `graph.annotations` from state and passes to renderer on every
@@ -127,17 +146,24 @@ commands, or architecture.
        datums; y-free boundaries linear in x (`x < 3`) become two-point
        `{ fnType: 'points', graphType: 'polyline', verticalLineX, points }`
        datums (`fn` carries the boundary expression only as function-plot's
-       data-join key). Anything else (`x^2 + y^2 < 9`, or a slider zeroing the
-       y-coefficient) stays `fnType: 'implicit'`, which function-plot's interval
-       renderer draws as ~1px cells, so strict implicit boundaries still look
-       solid (known limitation). All boundaries use `skipTip: true` and
-       `attr: { 'stroke-width': 2.5, 'stroke-linecap': 'butt',
+       data-join key). Anything else (`x^2 + y^2 < 9`, `x*y > 1`, `y^2 < 4`, or
+       a slider zeroing the y-coefficient) becomes a traced contour datum
+       `{ fnType: 'points', graphType: 'polyline', points: [], contourOf: id }`
+       whose paths the renderer traces with marching squares on every draw (one
+       continuous, dashable path per curve component). Only when no grid
+       evaluator compiles does it stay `fnType: 'implicit'` (function-plot's
+       interval renderer, ~1px cells, cannot dash). All boundaries use
+       `skipTip: true` and `attr: { 'stroke-width': 2.5, 'stroke-linecap': 'butt',
        'stroke-dasharray': strict ? '6,4' : 'none' }`; dash and cap are always
        explicit because function-plot reuses `<path>` nodes keyed by `d.fn`.
        Region shading is rendered by `FunctionPlotRenderer` on a custom canvas
-       overlay using the compiled inequality predicates. The renderer caches
-       the latest inequality descriptors and repaints shading during zoom/pan
-       interactions with requestAnimationFrame-coalesced redraws.
+       overlay. The renderer samples F once per viewport on a shared grid of
+       3px cell centres (plus a one-cell ring outside the plot for tracing),
+       caches the values per descriptor `key`, paints one rect per horizontal
+       run of satisfied cells, skips the repaint when the viewport and
+       inequalities are unchanged, and repaints during zoom/pan with
+       requestAnimationFrame-coalesced redraws. Descriptors without
+       `evaluateGrid` fall back to per-cell `evaluate(x, y)`.
 6. **Config**:
    - Primary: `configs/config.json` (loaded first). Fallback:
      `configs/default-config.js` (used when JSON unavailable).
@@ -244,7 +270,12 @@ commands, or architecture.
   (and may also exist under `client/`).
   `inequality-boundary-rendering.test.js` renders boundaries with the real
   function-plot library in jsdom and asserts on the SVG paths (dash attributes,
-  single continuous path, vertical-line refit on zoom, domain-gap splitting).
+  single continuous path, vertical-line refit on zoom, domain-gap splitting,
+  traced circles/hyperbolas/bands, no boundary on poles).
+  `tests/unit/math/inequality-field.test.js` checks grid values against
+  whole-expression math.js evaluation and the per-column/row evaluation count;
+  `tests/unit/math/marching-squares.test.js` covers tracing (closed loops,
+  components, open curves, domain gaps, saddles, poles, tangent points).
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
   add/edit expressions, confirm plot redraws, switch between `f(x)` and `θ`
   tabs, verify sliders appear in `θ` for parameters (e.g., `a*sin(b*x)`),
@@ -259,6 +290,15 @@ commands, or architecture.
   input into new Function or eval. Keep parsing through ExpressionParser only.
 - GraphEngine render requests are throttled via `requestAnimationFrame`; avoid
   synchronous heavy work or unnecessary rebuild loops in render paths.
+- Inequalities are the expensive path: every zoom/pan frame re-samples the
+  shading grid (~100k cells on a laptop-sized plot). Never evaluate a whole
+  math.js expression per cell (~150 ns each, ~15 ms per inequality per frame);
+  go through `compileInequalityField` so separable terms run per column/row
+  and per-cell work is closure arithmetic. Avoid function-plot's implicit
+  (interval) sampler for inequality boundaries: it costs ~8 ms per boundary per
+  frame and emits thousands of sub-paths. Measured on the 5-inequality sample
+  (1077x814 plot, DPR 2): pan went from ~7-9 fps to 60 fps, initial render from
+  ~130-180 ms to ~9 ms.
 
 ## Documentation discipline
 - Any code change that affects behavior, commands, structure, or conventions

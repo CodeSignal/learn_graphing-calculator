@@ -451,13 +451,39 @@ describe('GraphEngine (function-plot migration)', () => {
     ], {})
 
     expect(data).toHaveLength(1)
-    expect(data[0].fnType).toBe('implicit')
+    expect(data[0]).toMatchObject({ fnType: 'points', graphType: 'polyline', contourOf: 'i2' })
     expect(data[0].attr).toEqual(SOLID_BOUNDARY_ATTR)
     expect(inequalities).toHaveLength(1)
     expect(inequalities[0].strict).toBe(false)
     expect(inequalities[0].satisfiesPositive).toBe(false)
     expect(inequalities[0].evaluate(1, 1)).toBe(true)
     expect(inequalities[0].evaluate(5, 5)).toBe(false)
+  })
+
+  it('attaches grid evaluation, a predicate and a cache key to shading descriptors', () => {
+    const engine = new GraphEngine('graph-canvas')
+
+    const { inequalities } = engine.mapFunctionsToPlotData([
+      { id: 'c', expression: 'x^2 + y^2 < r^2', color: '#0b8', visible: true }
+    ], { r: 3, unused: 7 })
+
+    const [descriptor] = inequalities
+    expect(descriptor.key).toBe('(x^2 + y^2) - (r^2)|r=3')
+    expect(Array.from(descriptor.evaluateGrid([0, 3, 4], [0]))).toEqual([-9, 0, 7])
+    expect(descriptor.evaluateAt(4, 0)).toBe(7)
+
+    // the predicate applies the same strictness/tolerance as evaluate()
+    expect(descriptor.satisfies(-1)).toBe(true)
+    expect(descriptor.satisfies(0)).toBe(false)
+    expect(descriptor.satisfies(NaN)).toBe(false)
+    expect(descriptor.evaluate(0, 0)).toBe(true)
+    expect(descriptor.evaluate(3, 0)).toBe(false)
+
+    const inclusive = engine.buildInequalityPredicate({ strict: false, satisfiesPositive: true })
+    expect(inclusive(0)).toBe(true)
+    expect(inclusive(-1e-10)).toBe(true)
+    expect(inclusive(-1e-3)).toBe(false)
+    expect(inclusive(Infinity)).toBe(false)
   })
 
   describe('inequality boundary dash style', () => {
@@ -572,7 +598,7 @@ describe('GraphEngine (function-plot migration)', () => {
       expect(datum.attr).toEqual(DASHED_BOUNDARY_ATTR)
     })
 
-    it('falls back to an implicit datum when a slider zeroes the y coefficient', () => {
+    it('traces the boundary when a slider zeroes the y coefficient', () => {
       expect(mapSingle('a*y > x', { a: 2 }).datum).toMatchObject({
         fnType: 'linear',
         graphType: 'polyline'
@@ -580,15 +606,49 @@ describe('GraphEngine (function-plot migration)', () => {
 
       const { datum } = mapSingle('a*y > x', { a: 0 })
       expect(datum).toMatchObject({
-        fnType: 'implicit',
+        fnType: 'points',
+        graphType: 'polyline',
         fn: '(a*y) - (x)',
-        scope: { a: 0 },
+        contourOf: 'b1',
         attr: DASHED_BOUNDARY_ATTR
       })
     })
 
-    it('keeps genuinely implicit strict boundaries on the implicit datum', () => {
-      const { datum } = mapSingle('x^2 + y^2 < 9')
+    it.each([
+      ['x^2 + y^2 < 9', '(x^2 + y^2) - (9)', DASHED_BOUNDARY_ATTR],
+      ['x*y >= 1', '(x*y) - (1)', SOLID_BOUNDARY_ATTR],
+      ['y^2 > 4', '(y^2) - (4)', DASHED_BOUNDARY_ATTR]
+    ])('maps genuinely implicit boundary %s to a traced contour datum', (expression, fn, attr) => {
+      const { datum, inequality } = mapSingle(expression)
+
+      expect(datum).toEqual({
+        fnType: 'points',
+        graphType: 'polyline',
+        sampler: 'builtIn',
+        fn,
+        points: [],
+        contourOf: 'b1',
+        color: '#c0f',
+        skipTip: true,
+        attr
+      })
+      expect(typeof inequality.evaluateGrid).toBe('function')
+    })
+
+    it('keeps the implicit datum when no boundary grid is available', () => {
+      const engine = new GraphEngine('graph-canvas')
+      const datum = engine.buildInequalityBoundaryDatum(
+        {
+          type: 'inequality',
+          lhs: 'x^2 + y^2',
+          rhs: '9',
+          boundaryExpression: '(x^2 + y^2) - (9)',
+          strict: true
+        },
+        '(x^2 + y^2) - (9)',
+        {},
+        '#c0f'
+      )
 
       expect(datum).toEqual({
         fnType: 'implicit',

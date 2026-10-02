@@ -78,6 +78,45 @@ alter math behavior.
    Symbolic analysis (parse, `derivative`, `simplify`) is LRU-cached per
    `boundaryExpression` (200 entries); per-render work is only numeric
    evaluation of the cached compiled coefficients.
+9. `inequality-field.js`: `compileInequalityField(boundaryExpression, scope)`
+   returns `{ key, evaluateGrid(xs, ys), evaluateAt(x, y) }` or `null` (parse
+   failure / empty input). F is split at top-level `+`, `-`, unary `-` into
+   terms; each term is constant, x-only, y-only, a product/quotient of
+   single-axis factors (`x*y`, `2*x*y/3`), or mixed. `evaluateGrid` evaluates
+   x-only terms and x-factors once per column, y-only terms and y-factors once
+   per row, and only mixed terms (`sin(x*y)`, `(x^2 + y^2)^2`) per cell, into a
+   row-major `Float64Array` (`values[j * xs.length + i]`). Each term also gets
+   a numeric fast path (`compileFast`): plain closures composed over the AST
+   (no code generation) for numbers, x, y, bound parameters, pi/e,
+   `+ - * / ^`, unary +/-, and the one-argument functions whose math.js number
+   implementation is the same `Math.*` call (sin, cos, tan, asin, acos, atan,
+   sinh, cosh, tanh, exp, log, sqrt, abs). A finite fast result is used as is;
+   anything else (NaN where math.js would return a Complex, infinities,
+   unsupported nodes such as `cbrt`, `floor`, `mod`, 2-argument `log`) is
+   evaluated by math.js (compiled, Map scope). `pow` keeps NaN for NaN inputs
+   (`Math.pow(NaN, 0)` is 1). A non-number math.js result (Complex from
+   `sqrt(-1)`, a thrown error such as an undefined symbol) becomes NaN.
+   math.js never turns a Complex back into a number under `+ - * /`, so a value
+   is finite exactly when whole-expression evaluation would be; only float
+   association differs (~1e-16 relative). Adding a function to the fast list
+   requires its math.js number implementation to be exactly that `Math.*`
+   call for every input where the result is finite (`round`, `floor`, `ceil`,
+   `cbrt`, `mod` are not). `evaluateAt` uses the same summation
+   order, so it reproduces grid values bit for bit. `key` is the expression
+   plus the values of the parameters it references (unrelated sliders do not
+   invalidate caches). Term analysis is LRU-cached per expression (200
+   entries).
+10. `marching-squares.js`: `traceContours(values, cols, rows, xs, ys,
+    { evaluate })` traces F = 0 on a sampled grid into polylines in xs/ys
+    coordinates. Corners count as inside when F > 0; crossings are linearly
+    interpolated; cells with a non-finite corner are skipped (curves stop at
+    domain gaps); saddles use the cell mean. Segments are joined through shared
+    edge points into open curves (ending on the grid border or a gap) or
+    closed loops (first point repeated). With `evaluate`, each crossing is
+    classified once: F at the interpolated point must not exceed the sample on
+    its side (fast path), else 4 bisection steps decide (|F| shrinks at a root,
+    grows at a pole); pole crossings are dropped, so `x/y > 1` gets no line on
+    y = 0 and `tan`/`1/(...)` boundaries show only their F = 0 curves.
 
 ## Expectations & constraints
 - **Syntax vs. Semantics separation**: `parseAssignmentSyntax()` and
@@ -100,6 +139,15 @@ alter math behavior.
 ## Performance & accuracy
 - Avoid heavy synchronous work inside render paths. GraphEngine classifies each
   visible expression during redraw, so keep parser/classifier operations cheap.
+- Inequality shading/tracing samples ~100k grid cells per zoom/pan frame. A
+  whole-expression math.js evaluation costs ~150 ns, so per-cell evaluation is
+  ~15 ms per inequality per frame; `inequality-field.js` keeps per-cell work to
+  arithmetic for separable boundaries (lines, circles, ellipses, `x*y`), and
+  mixed terms run through the numeric fast path (math.js only where it returns
+  NaN or uses unsupported functions, where the per-cell price remains).
+- Traced boundaries are accurate to linear interpolation on the 3px grid
+  (sub-pixel for smooth curves); features thinner than one 3px cell can be
+  missed, unlike function-plot's interval renderer.
 
 ## Testing
 - Unit tests:
@@ -108,16 +156,26 @@ alter math behavior.
   - `tests/unit/math/parameter-utils.test.js` covers parameter inference rules.
   - `tests/unit/math/inequality-boundary.test.js` covers boundary solving
     (explicit, vertical, implicit fallback, scope-dependent degeneracy).
+  - `tests/unit/math/inequality-field.test.js` compares grid values with
+    whole-expression math.js evaluation (separable, products, mixed, domains,
+    poles, parameters, Complex-sensitive cases such as `abs(sqrt(x*y))`),
+    checks math.js reads x/y once per column/row unless a term is mixed, and
+    that the fast path skips math.js except where it yields NaN.
+  - `tests/unit/math/marching-squares.test.js` covers closed loops, multiple
+    components, open curves, domain gaps, saddles, pole rejection and tangent
+    points between grid vertices.
 - Run with `npm run test` or `npm run test:run`.
 - When modifying math behavior, update/add tests to maintain coverage.
 
 ## Known limitations
 - **Single-comparator inequalities only**: Chained comparisons are rejected.
-- **Dashed strict boundaries need an explicit form**: only boundaries that
-  `inequality-boundary.js` can rewrite as `y = f(x)` or `x = c` render dashed.
-  Genuinely implicit boundaries (circles, `y^2 < 4`, `x^2 < 4`, `x*y > 1`) keep
-  function-plot's interval renderer, whose per-pixel sub-paths restart the dash
-  pattern, so they look solid even when strict.
+- **Traced boundaries are grid-limited**: genuinely implicit boundaries
+  (circles, `y^2 < 4`, `x^2 < 4`, `x*y > 1`) are traced on the 3px shading
+  grid, so loops or gaps smaller than a cell can vanish, and pole edges of a
+  region (`tan(x*y) > 1`) are not drawn.
+- **`ln` in inequality shading**: shading evaluates the raw boundary with
+  math.js, which has no `ln`, so `y < ln(x)` draws its boundary (plot text maps
+  `ln` -> `log`) but shades nothing (pre-existing; unchanged).
 - **Parametric expressions**: Not yet supported (`x(t)`, `y(t)`); architecture ready.
 
 ## Documentation rule

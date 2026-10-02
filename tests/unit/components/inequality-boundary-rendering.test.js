@@ -147,10 +147,76 @@ describe('inequality boundary rendering (real function-plot)', () => {
     })
   })
 
-  it('still draws genuinely implicit boundaries as interval cells (known limitation)', () => {
-    const [[path]] = render(['x^2 + y^2 < 9'])
+  const toData = (path) => parsePolyline(path).map(([px, py]) => [
+    renderer.chart.meta.xScale.invert(px),
+    renderer.chart.meta.yScale.invert(py)
+  ])
 
+  it('traces a strict circle boundary as one closed dashed path', () => {
+    const [paths] = render(['x^2 + y^2 < 9'])
+
+    expect(paths).toHaveLength(1)
+    const [path] = paths
     expect(path.getAttribute('stroke-dasharray')).toBe('6,4')
-    expect(subpathCount(path)).toBeGreaterThan(100)
+    expect(path.getAttribute('stroke-linecap')).toBe('butt')
+    expect(path.getAttribute('stroke-width')).toBe('2.5')
+    expect(path.getAttribute('stroke')).toBe('#3355ff')
+    expect(subpathCount(path)).toBe(1)
+    expect(path.getAttribute('d')).not.toMatch(/\bv\b/)
+
+    const points = toData(path)
+    expect(points.length).toBeGreaterThan(50)
+    expect(points[0][0]).toBeCloseTo(points[points.length - 1][0], 6)
+    expect(points[0][1]).toBeCloseTo(points[points.length - 1][1], 6)
+    points.forEach(([x, y]) => {
+      expect(Math.abs(Math.hypot(x, y) - 3)).toBeLessThan(0.02)
+    })
+  })
+
+  it('traces an inclusive circle boundary as a solid path', () => {
+    const [[path]] = render(['x^2 + y^2 >= 9'])
+
+    expect(path.getAttribute('stroke-dasharray')).toBe('none')
+    expect(subpathCount(path)).toBe(1)
+  })
+
+  it('re-traces implicit boundaries for the current viewport on every draw', () => {
+    render(['x^2 + y^2 < 9'])
+
+    renderer.chart.meta.xScale.domain([2, 4])
+    renderer.chart.meta.yScale.domain([-1, 1])
+    renderer.chart.draw()
+
+    const [path] = container.querySelectorAll('g.graph path.line')
+    const points = toData(path)
+    // only the right-hand arc is in view, as one open path that leaves the plot at both ends
+    expect(points[0][1]).not.toBeCloseTo(points[points.length - 1][1], 1)
+    points.forEach(([x, y]) => {
+      expect(Math.abs(Math.hypot(x, y) - 3)).toBeLessThan(0.002)
+    })
+  })
+
+  it('draws one dashed path per boundary component', () => {
+    const [hyperbola, band] = render(['x*y > 1', 'y^2 < 4'])
+
+    expect(hyperbola).toHaveLength(2)
+    expect(band).toHaveLength(2)
+    ;[...hyperbola, ...band].forEach((path) => {
+      expect(path.getAttribute('stroke-dasharray')).toBe('6,4')
+      expect(subpathCount(path)).toBe(1)
+    })
+    band.forEach((path) => {
+      toData(path).forEach(([, y]) => expect(Math.abs(Math.abs(y) - 2)).toBeLessThan(0.01))
+    })
+  })
+
+  it('does not draw a pole (sign change through infinity) as a boundary', () => {
+    const [paths] = render(['x/y > 1'])
+
+    // the boundary is y = x only; F jumps from +inf to -inf across y = 0 without a root
+    expect(paths.length).toBeGreaterThanOrEqual(1)
+    paths.forEach((path) => {
+      toData(path).forEach(([x, y]) => expect(Math.abs(x - y)).toBeLessThan(0.05))
+    })
   })
 })

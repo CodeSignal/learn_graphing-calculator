@@ -176,10 +176,10 @@
         One comparator only: <code>&lt;</code>, <code>&lt;=</code>, <code>&gt;</code>,
         or <code>&gt;=</code>. The expression must involve <code>x</code> or
         <code>y</code>. Example: <code>x^2 + y^2 &lt; 1</code>. Strict inequalities
-        use a dashed boundary; inclusive use a solid boundary. Dashes are drawn when
-        the boundary is a curve <code>y = f(x)</code> or a vertical line
-        <code>x = c</code> (e.g. <code>y &gt; 2x - 1</code>, <code>x &lt; 3</code>);
-        other curved boundaries, such as circles, are always drawn solid.
+        use a dashed boundary; inclusive use a solid boundary. This applies to lines,
+        vertical lines and curved boundaries such as circles
+        (e.g. <code>y &gt; 2x - 1</code>, <code>x &lt; 3</code>,
+        <code>x^2 + y^2 &lt; 4</code>, <code>x*y &gt; 1</code>).
       </p>
       <p>Chained comparisons like <code>-1 &lt; x &lt; 1</code> are not supported.</p>
 

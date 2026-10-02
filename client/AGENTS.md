@@ -79,10 +79,23 @@ styling is a last resort.
   using chart scales/margins after each draw. The renderer caches current
   inequality descriptors and repaints shading during zoom/pan interactions with
   requestAnimationFrame-coalesced redraws.
+  Shading and implicit boundary tracing share one sampling grid per viewport
+  (`getSamplingGrid()`: 3px cell centres plus a one-cell ring outside the
+  plot). `getInequalityField()` evaluates a descriptor's `evaluateGrid` once per
+  grid and caches it by descriptor `key` (pruned in `updateData`), so the
+  shading pass after a zoom draw and redraws for unrelated edits reuse it.
+  `renderInequalities()` applies `satisfies(F)` per cell and paints one
+  `fillRect` per horizontal run (same pixels as per-cell rects), and returns
+  early when the paint signature (grid, canvas size, each descriptor's
+  key/color/operator) matches the last pass. Descriptors without
+  `evaluateGrid`/`key` use per-cell `evaluate(x, y)` and always repaint.
   It also hooks two function-plot events for dashable boundary polylines:
   `before:draw` re-fits datums with `verticalLineX` to the visible y-domain
   (+5% overscan) on every draw, including zoom/pan frames; `eval` (fired after
-  sampling, before drawing) adjusts `graphType: 'polyline'` + `fnType: 'linear'`
+  sampling, before drawing) replaces the samples of `contourOf` datums with the
+  boundary traced by `math/marching-squares.js` on that inequality's cached
+  grid (one group, i.e. one `<path>`, per curve component; cached with the
+  field), and adjusts `graphType: 'polyline'` + `fnType: 'linear'`
   sample groups in place: it splits them at domain gaps (NaN samples, e.g.
   `sqrt(x^2 - 4)`) so no false segment bridges the gap, and clamps y to the
   visible domain ± one height so steep curves (`y > e^x`) stay short enough for
@@ -94,19 +107,21 @@ styling is a last resort.
   aspect correction.
 - `mapFunctionsToPlotData` now returns `{ data, meta, inequalities }` where
   `inequalities` contains shading descriptors with compiled
-  `evaluate(x, y)` functions. GraphEngine passes these to
+  `evaluate(x, y)` functions and, when `compileInequalityField()` compiles the
+  boundary, `key`, `evaluateGrid(xs, ys)`, `evaluateAt(x, y)` and
+  `satisfies(F)`. GraphEngine passes these to
   `FunctionPlotRenderer.updateData(data, inequalities)`.
   Generated function-plot datums also attach SVG `attr` defaults for visibility:
   scatter points use `r: 6` and stroke width `2`; explicit, implicit, vector,
   and inequality boundary strokes use stroke width `2.5`.
   Inequality boundaries come from `buildInequalityBoundaryDatum()`: explicit
-  polyline (linear in y), two-point vertical polyline (`x <op> c`), or implicit
-  fallback. Their `attr` always sets `stroke-linecap: 'butt'` and
+  polyline (linear in y), two-point vertical polyline (`x <op> c`), traced
+  contour polyline (`contourOf: id`, `points: []`; circles, `x*y > 1`,
+  `y^2 < 4`), or, only when no grid evaluator compiles, implicit fallback.
+  Their `attr` always sets `stroke-linecap: 'butt'` and
   `stroke-dasharray` (`'6,4'` strict, `'none'` inclusive). function-plot reuses
   `<path>` nodes keyed by `d.fn` and never clears attributes, so leaving the
-  dash unset would keep a stale dash after a `<` -> `<=` edit. Strict implicit
-  boundaries (e.g. circles) still render solid-looking because the interval
-  renderer draws one sub-path per pixel cell.
+  dash unset would keep a stale dash after a `<` -> `<=` edit.
 
 ## Utilities
 - Line classification lives in `math/line-classifier.js` and is the single
@@ -124,7 +139,11 @@ styling is a last resort.
   caching across components.
 - `math/inequality-boundary.js` (`resolveInequalityBoundary(plotData, scope)`)
   decides whether an inequality boundary can be drawn as `y = f(x)` or `x = c`
-  (dashable polylines) or must stay implicit.
+  (dashable polylines) or must be traced.
+- `math/inequality-field.js` (`compileInequalityField(boundaryExpression,
+  scope)`) evaluates F = (lhs) - (rhs) on a sampling grid with separable terms
+  evaluated per column/row; `math/marching-squares.js` (`traceContours`) traces
+  F = 0 on that grid into joined polylines.
 - `math/expression-adapter.js` is the single expression adaptation layer:
   `toFunctionPlotSyntax()` normalizes plot expressions for function-plot,
   `toDisplayLatex()` converts raw user input into polished LaTeX for display,
