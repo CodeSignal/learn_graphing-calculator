@@ -96,6 +96,10 @@ commands, or architecture.
        `id: (x, y)` using `datumMeta`.
      - Reads `graph.annotations` from state and passes to renderer on every
        `init()` and `rebuild()`.
+     - Reads `graph.xAxisLabel` / `graph.yAxisLabel`, normalizes them to
+       trimmed strings (`''` = no label) via `getAxisLabels()`, and passes
+       them to renderer `init()`/`rebuild()`. Label changes count as display
+       changes in `syncDisplayConfigFromGraph()` and trigger a rebuild.
      - For explicit expressions with `func.derivative`, auto-computes the
        symbolic derivative via `computeDerivative()` (or uses the caller-
        supplied `fn` string) and attaches it to the datum. `updateOnMouseMove`
@@ -130,6 +134,10 @@ commands, or architecture.
      `{ x?: number, y?: number, text?: string }`. Vertical line if `x` set,
      horizontal if `y` set. Defaults to `[]`. Validated and normalized by
      `ConfigLoader`. Passed to function-plot on every render.
+   - `graph.xAxisLabel` / `graph.yAxisLabel` (optional strings): axis titles.
+     Absent by default (no default is injected); `ConfigLoader` rejects
+     non-strings; empty/blank strings mean no label. Rendered natively by
+     function-plot (`xAxis.label` / `yAxis.label`).
    - Function entries support optional `derivative` (object) and `secants`
      (array) fields for educational overlays; see Coding rules for semantics.
 7. **Logging**:
@@ -200,6 +208,20 @@ commands, or architecture.
   `rebuild`. They are config-driven; to update at runtime call
   `StateManager.set('graph', { ...StateManager.get('graph'), annotations: [...] })`
   which triggers a rebuild.
+- **Axis labels**: `state.graph.xAxisLabel` / `yAxisLabel` map to function-plot
+  `options.xAxis.label` / `options.yAxis.label` in `FunctionPlotRenderer`
+  (`applyAxisLabel()`; blank removes the key). function-plot 1.24.4 draws them
+  in `Chart.buildAxisLabel()` on every `build()` as `text.x.axis-label`
+  (bottom-right of the plot area, `y = height - 6`, above the x tick numbers)
+  and `text.y.axis-label` (`rotate(-90)`, top-left, right of the y tick
+  numbers). Zoom/pan and data updates call `draw()`, which leaves them alone;
+  resize/reset/zoom buttons call `build()`, which repositions them. On
+  `rebuild()`, an omitted label keeps the current one, a string replaces it.
+  Styling lives in `app.css` (`#graph-canvas .function-plot .axis-label`):
+  `--graph-axis-label-fill` (`--Colors-Text-Body-Strong`) plus a
+  `--canvas-bg` halo via `paint-order: stroke`, so it follows both themes
+  without a dark-mode media block. Runtime change:
+  `StateManager.set('graph', { ...StateManager.get('graph'), xAxisLabel: '...' })`.
 - **Classification metadata**: `state.functions` entries may include derived
   classification fields (`kind`, `graphMode`, `error`, `paramName`, `value`,
   `usedVariables`, `plotExpression`, `plotData`) for UI consistency;
@@ -222,9 +244,11 @@ commands, or architecture.
 
 ## Testing & QA
 - **Automated tests**: Unit tests for math/core/components (including
-  `graph-engine.test.js` and `function-plot-renderer.test.js`) run with
-  `npm run test` or `npm run test:run`. Use Vitest; tests live under `tests/`
-  (and may also exist under `client/`).
+  `graph-engine.test.js`, `function-plot-renderer.test.js`, and
+  `core/config-loader.test.js`) run with `npm run test` or `npm run test:run`.
+  Use Vitest; tests live under `tests/` (and may also exist under `client/`).
+  `components/function-plot-axis-labels.test.js` renders through the real
+  (unmocked) function-plot in jsdom to assert the SVG axis-label text.
 - **Manual smoke**: run `npm run start:dev`, open `http://localhost:3000`,
   add/edit expressions, confirm plot redraws, switch between `f(x)` and `θ`
   tabs, verify sliders appear in `θ` for parameters (e.g., `a*sin(b*x)`),

@@ -4,6 +4,23 @@ const INEQUALITY_SAMPLE_STEP = 3;
 const INEQUALITY_SHADE_ALPHA = 0.18;
 
 /**
+ * Set or clear an axis title on a function-plot axis options object.
+ * function-plot renders `xAxis.label` / `yAxis.label` natively as
+ * `text.x.axis-label` / `text.y.axis-label` on every `build()`, and removes
+ * the element when the label is missing. Blank strings mean "no label".
+ * @param {Object} axisOptions - `options.xAxis` or `options.yAxis`
+ * @param {string} label - Axis title text
+ */
+function applyAxisLabel(axisOptions, label) {
+  const text = typeof label === 'string' ? label.trim() : '';
+  if (text) {
+    axisOptions.label = text;
+  } else {
+    delete axisOptions.label;
+  }
+}
+
+/**
  * Thin adapter around function-plot so GraphEngine stays focused on
  * state/event orchestration.
  */
@@ -34,7 +51,9 @@ export default class FunctionPlotRenderer {
     showGrid,
     onZoom,
     tipRenderer,
-    annotations
+    annotations,
+    xAxisLabel,
+    yAxisLabel
   }) {
     if (!this.container) return;
 
@@ -65,6 +84,9 @@ export default class FunctionPlotRenderer {
       annotations: Array.isArray(annotations) ? annotations : [],
       data: []
     };
+
+    applyAxisLabel(this.options.xAxis, xAxisLabel);
+    applyAxisLabel(this.options.yAxis, yAxisLabel);
 
     this.ensureInequalityCanvas();
     this.syncInequalityCanvasSize(width, height);
@@ -104,7 +126,7 @@ export default class FunctionPlotRenderer {
     this.renderInequalities(this.currentInequalities);
   }
 
-  rebuild({ width, height, viewport, showGrid, annotations }) {
+  rebuild({ width, height, viewport, showGrid, annotations, xAxisLabel, yAxisLabel }) {
     if (!this.chart || !this.options) return;
 
     this.options.width = width;
@@ -117,6 +139,15 @@ export default class FunctionPlotRenderer {
 
     this.options.xAxis.domain = [viewport.xMin, viewport.xMax];
     this.options.yAxis.domain = [viewport.yMin, viewport.yMax];
+
+    // Like annotations: omitted (undefined) keeps the current label; a string
+    // replaces it, and a blank string removes it.
+    if (xAxisLabel !== undefined) {
+      applyAxisLabel(this.options.xAxis, xAxisLabel);
+    }
+    if (yAxisLabel !== undefined) {
+      applyAxisLabel(this.options.yAxis, yAxisLabel);
+    }
 
     this.ensureInequalityCanvas();
     this.syncInequalityCanvasSize(width, height);

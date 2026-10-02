@@ -21,6 +21,15 @@ const INEQUALITY_EPSILON = 1e-9;
 const POINT_ATTR = { r: 6, 'stroke-width': 2 };
 const STROKE_ATTR = { 'stroke-width': 2.5 };
 
+/**
+ * Normalize an optional `graph.xAxisLabel` / `graph.yAxisLabel` value.
+ * @param {*} value - Raw graph state value
+ * @returns {string} Trimmed label, or '' when absent/blank/non-string
+ */
+function normalizeAxisLabel(value) {
+  return typeof value === 'string' ? value.trim() : '';
+}
+
 export default class GraphEngine {
   constructor(containerId) {
     this.container = document.getElementById(containerId);
@@ -38,7 +47,7 @@ export default class GraphEngine {
 
     // Render lifecycle flags
     this.needsRebuild = true;
-    this.syncedDisplayConfig = { showGrid: null };
+    this.syncedDisplayConfig = { showGrid: null, xAxisLabel: null, yAxisLabel: null };
 
     // Metadata parallel to the renderer's data array (one entry per plotted datum)
     this.datumMeta = [];
@@ -219,14 +228,32 @@ export default class GraphEngine {
       return false;
     }
 
-    const nextShowGrid = graph.showGrid === true;
+    const next = {
+      showGrid: graph.showGrid === true,
+      ...this.getAxisLabels(graph)
+    };
 
-    if (this.syncedDisplayConfig.showGrid !== nextShowGrid) {
-      this.syncedDisplayConfig.showGrid = nextShowGrid;
-      return true;
-    }
+    let changed = false;
+    Object.keys(next).forEach((key) => {
+      if (this.syncedDisplayConfig[key] !== next[key]) {
+        this.syncedDisplayConfig[key] = next[key];
+        changed = true;
+      }
+    });
 
-    return false;
+    return changed;
+  }
+
+  /**
+   * Axis titles from graph state, normalized for the renderer.
+   * @param {Object} graph - Graph state
+   * @returns {{xAxisLabel: string, yAxisLabel: string}} '' means no label
+   */
+  getAxisLabels(graph) {
+    return {
+      xAxisLabel: normalizeAxisLabel(graph?.xAxisLabel),
+      yAxisLabel: normalizeAxisLabel(graph?.yAxisLabel)
+    };
   }
 
   debounceSaveViewport() {
@@ -279,6 +306,7 @@ export default class GraphEngine {
 
     const showGrid = graph.showGrid === true;
     const annotations = Array.isArray(graph.annotations) ? graph.annotations : [];
+    const { xAxisLabel, yAxisLabel } = this.getAxisLabels(graph);
     const { data, meta, inequalities } = this.mapFunctionsToPlotData(functions, scope);
     this.datumMeta = meta;
     const viewportForRender = this.getAspectLockedViewport(this.viewport);
@@ -290,6 +318,8 @@ export default class GraphEngine {
         viewport: viewportForRender,
         showGrid,
         annotations,
+        xAxisLabel,
+        yAxisLabel,
         onZoom: this.boundOnRendererZoom,
         tipRenderer: this.tipRenderer.bind(this)
       });
@@ -300,7 +330,9 @@ export default class GraphEngine {
         height: this.height,
         viewport: viewportForRender,
         showGrid,
-        annotations
+        annotations,
+        xAxisLabel,
+        yAxisLabel
       });
       this.needsRebuild = false;
     }

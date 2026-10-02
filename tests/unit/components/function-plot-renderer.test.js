@@ -260,6 +260,90 @@ describe('FunctionPlotRenderer', () => {
     expect(renderer.options.annotations).toEqual(annotations)
   })
 
+  it('passes axis labels to function-plot xAxis/yAxis options on init', () => {
+    const renderer = new FunctionPlotRenderer(container)
+
+    renderer.init({
+      width: 640,
+      height: 360,
+      viewport: { xMin: 60, xMax: 80, yMin: 110, yMax: 210 },
+      showGrid: true,
+      onZoom: vi.fn(),
+      xAxisLabel: 'Third-exam score',
+      yAxisLabel: 'Final-exam score'
+    })
+
+    const initOptions = functionPlotMock.mock.calls[0][0]
+    expect(initOptions.xAxis).toEqual({
+      type: 'linear',
+      domain: [60, 80],
+      label: 'Third-exam score'
+    })
+    expect(initOptions.yAxis).toEqual({
+      type: 'linear',
+      domain: [110, 210],
+      label: 'Final-exam score'
+    })
+  })
+
+  it('omits axis label options when labels are absent or blank', () => {
+    const renderer = new FunctionPlotRenderer(container)
+
+    renderer.init({
+      width: 640,
+      height: 360,
+      viewport: { xMin: -5, xMax: 5, yMin: -3, yMax: 3 },
+      showGrid: true,
+      onZoom: vi.fn(),
+      yAxisLabel: '   '
+    })
+
+    const initOptions = functionPlotMock.mock.calls[0][0]
+    expect(initOptions.xAxis).not.toHaveProperty('label')
+    expect(initOptions.yAxis).not.toHaveProperty('label')
+  })
+
+  it('updates, clears, and preserves axis labels on rebuild', () => {
+    const renderer = new FunctionPlotRenderer(container)
+
+    renderer.init({
+      width: 400,
+      height: 300,
+      viewport: { xMin: -8, xMax: 8, yMin: -6, yMax: 6 },
+      showGrid: true,
+      onZoom: vi.fn(),
+      xAxisLabel: 'Time (s)',
+      yAxisLabel: 'Distance (m)'
+    })
+
+    const chart = renderer.chart
+    chart.build.mockClear()
+
+    // Omitted labels (e.g. a size-only rebuild) keep the current titles
+    renderer.rebuild({
+      width: 600,
+      height: 420,
+      viewport: { xMin: -4, xMax: 4, yMin: -3, yMax: 3 },
+      showGrid: true
+    })
+    expect(chart.options.xAxis.label).toBe('Time (s)')
+    expect(chart.options.yAxis.label).toBe('Distance (m)')
+    expect(chart.options.xAxis.domain).toEqual([-4, 4])
+
+    // A new string replaces the title; an empty string removes it
+    renderer.rebuild({
+      width: 600,
+      height: 420,
+      viewport: { xMin: -4, xMax: 4, yMin: -3, yMax: 3 },
+      showGrid: true,
+      xAxisLabel: 'Hours studied',
+      yAxisLabel: ''
+    })
+    expect(chart.options.xAxis.label).toBe('Hours studied')
+    expect(chart.options.yAxis).not.toHaveProperty('label')
+    expect(chart.build).toHaveBeenCalledTimes(2)
+  })
+
   it('updates data through draw without rebuilding', () => {
     const renderer = new FunctionPlotRenderer(container)
 

@@ -17,8 +17,10 @@ styling is a last resort.
    parallel apps.
 3. CSS:
    - `app.css`: base layout, utilities, and custom overrides. Uses design system
-     tokens and variables. Keeps only one function-plot override: legend hidden
-     (sidebar is our legend; no native option).
+     tokens and variables. function-plot overrides: legend hidden (sidebar is
+     our legend; no native option), tip font size, dark-mode grid/origin
+     strokes, and axis-title styling (`.axis-label`: DS text token fill,
+     DS body font/size, `--canvas-bg` halo via `paint-order: stroke`).
 
 ## Design System usage
 - Use components from `design-system/components/*` (buttons, modal,
@@ -74,6 +76,9 @@ styling is a last resort.
   axis ticks/labels, grid via options, and on-curve tip (crosshairs + tooltip).
   Accepts `tipRenderer` (function) and `annotations` (array) in `init()`;
   `rebuild()` also accepts `annotations` to update reference lines.
+  Both also accept `xAxisLabel` / `yAxisLabel` strings, mapped onto
+  function-plot's native `xAxis.label` / `yAxis.label` (blank removes the
+  label; on `rebuild()` an omitted value keeps the current label).
   Inequality region shading is rendered on a custom
   `.inequality-overlay-canvas` layer (absolute-positioned, pointer-events none)
   using chart scales/margins after each draw. The renderer caches current
@@ -126,6 +131,10 @@ styling is a last resort.
 - `graph.annotations`: optional `[{x?, y?, text?}]` for reference lines.
   Validated by ConfigLoader (must have `x` or `y`; defaults to `[]`).
   Passed to function-plot on every `init`/`rebuild`.
+- `graph.xAxisLabel` / `graph.yAxisLabel`: optional axis-title strings
+  (absent by default; non-strings rejected by ConfigLoader; empty = no label).
+  GraphEngine passes them on every `init`/`rebuild` and rebuilds when they
+  change in `graph` state.
 - Function entries support optional `derivative: {fn?, x0?, updateOnMouseMove?}`
   and `secants: [{x0, x1?, updateOnMouseMove?}]` for educational overlays on
   explicit expressions. ConfigLoader normalizes and strips invalid structures.
