@@ -166,6 +166,9 @@ styling is a last resort.
     instead of reclassifying inside assignment creation
   - Uses debouncing (300ms), but defers detection while a text expression input
     is focused and runs it on `expressions:committed`
+  - Synchronizes valid assignment values and requests a redraw while their text
+    input is focused, including decimal values; full parameter detection stays
+    deferred until commit so incomplete graph expressions do not alter controls
   - Ignores reserved function names (`points`, `vector`) during symbol
     extraction so they are never treated as parameters
 - ExpressionList creates ParameterSlider instances for assignment expressions.

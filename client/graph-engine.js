@@ -96,6 +96,7 @@ export default class GraphEngine {
       EventBus.subscribe('state:changed:functions', () => {
         this.requestRender();
         if (this.isExpressionInputFocused()) {
+          this.syncAssignmentValuesDuringEdit();
           this.hasDeferredParameterDetection = true;
           if (this.parameterDetectionTimeout) {
             clearTimeout(this.parameterDetectionTimeout);
@@ -615,6 +616,35 @@ export default class GraphEngine {
   }
 
   /**
+   * Keep valid parameter assignments responsive while their input is focused.
+   * Full parameter detection remains deferred so incomplete graph expressions
+   * do not create or remove controls mid-edit.
+   */
+  syncAssignmentValuesDuringEdit() {
+    const functions = StateManager.get('functions') || [];
+    const parameters = { ...(StateManager.get('parameters') || {}) };
+    const { assignmentValues } = analyzeParameters(functions, sharedParser);
+    let parametersChanged = false;
+
+    assignmentValues.forEach((value, paramName) => {
+      const existing = parameters[paramName];
+      if (existing?.value === value) return;
+
+      parameters[paramName] = {
+        ...DEFAULT_PARAMETER,
+        ...(existing || {}),
+        value
+      };
+      parametersChanged = true;
+    });
+
+    if (parametersChanged) {
+      StateManager.set('parameters', parameters);
+      this.requestRender();
+    }
+  }
+
+  /**
    * Detect new parameters from expressions and update parameters state
    * Called outside render cycle to prevent state mutations during rendering
    * Also auto-creates assignment expressions for newly detected parameters
@@ -660,6 +690,9 @@ export default class GraphEngine {
 
     if (parametersChanged) {
       StateManager.set('parameters', parameters);
+      // Assignment edits update the evaluation scope after the functions change
+      // has already rendered. Redraw with the synchronized parameter values.
+      this.requestRender();
     }
 
     if (analysis.missingAssignments.length > 0) {
