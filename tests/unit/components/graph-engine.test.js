@@ -984,6 +984,36 @@ describe('GraphEngine (function-plot migration)', () => {
     expect(mockState.functions.some((func) => func.expression === 's = 1.0')).toBe(true)
   })
 
+  it('redraws with a decimal assignment value before the input is committed', () => {
+    mockState.functions = [
+      { id: 'graph', expression: 'y = m*x', color: '#f80', visible: true },
+      { id: 'parameter_m', expression: 'm = 1', color: '#08f', visible: true }
+    ]
+
+    const engine = new GraphEngine('graph-canvas')
+    engine.init()
+    vi.runOnlyPendingTimers()
+
+    const input = document.createElement('input')
+    input.className = 'expression-input'
+    document.body.appendChild(input)
+    input.focus()
+
+    mockState.functions[1] = {
+      ...mockState.functions[1],
+      expression: 'm = 3.5'
+    }
+    EventBus.publish('state:changed:functions', {
+      path: 'functions',
+      value: mockState.functions
+    })
+    vi.runOnlyPendingTimers()
+
+    const renderer = rendererInstances[0]
+    expect(mockState.parameters.m.value).toBe(3.5)
+    expect(renderer.dataCalls.at(-1).data[0].scope.m).toBe(3.5)
+  })
+
   it('still detects parameters for non-typing function changes', () => {
     const engine = new GraphEngine('graph-canvas')
     engine.init()
